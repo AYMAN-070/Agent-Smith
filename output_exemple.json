@@ -1,0 +1,31 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hello! I am a large language model created by Google. I'm here to help you answer questions, generate content, solve problems, and explore ideas.",
+            "thoughtSignature": "EmAKXgFpFH0TaNxa4306ExvdSyXRj6HpIlYrFLErKLL5bCKiU2IOUZimYGwibBhc22mgBFYWWyWY6JlxUkbNYG6gt6XqY8QJG8bY0MqkH+vZkX8iGsWJpkaVbZuQjUMjSi8="
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 17,
+    "candidatesTokenCount": 32,
+    "totalTokenCount": 49,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 17
+      }
+    ],
+    "serviceTier": "standard"
+  },
+  "modelVersion": "gemini-3.5-flash-lite",
+  "responseId": "uNLMasuZAoD6xs0PhbnK0Q0"
+}
