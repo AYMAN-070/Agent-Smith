@@ -1,19 +1,16 @@
 import builtins
 import types
-import resource
-import multiprocessing
-from multiprocessing.queues import Queue
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Union
-from sandbox_config import SandboxConfig
+from src.models import SandboxConfig
 
 ModuleMapping = Mapping[str, Union[types.ModuleType, Mapping[str, Any]]]
 
 
 def create_safe_environment(
-    config: 'SandboxConfig',
+    config: SandboxConfig,
     custom_modules: Optional[Any] = None,
 ) -> Dict[str, Any]:
-
+    """Create a restricted execution with safe builtins and imports."""
     safe_builtins: Dict[str, Any] = {
         'print': print,
         'len': len,
@@ -77,11 +74,9 @@ def create_safe_import(
     authorized_imports: Sequence[str],
     custom_modules: Optional[ModuleMapping] = None,
 ) -> Callable[..., Any]:
+    """Create a guarded __import__ function that respects allowed imports ."""
     real_import = builtins.__import__
-    if custom_modules is not None:
-        resolved_custom_modules = custom_modules
-    else:
-        resolved_custom_modules = {}
+    resolved_custom_modules: ModuleMapping = custom_modules if custom_modules is not None else {}
 
     def safe_import(
         name: str,
@@ -93,8 +88,6 @@ def create_safe_import(
         # 1. Check if a custom or mocked module is provided
         if name in resolved_custom_modules:
             mod = resolved_custom_modules[name]
-            # Convert a dictionary of functions or attributes into a
-            # ModuleType if needed
             if isinstance(mod, Mapping):
                 fake_module = types.ModuleType(name)
                 for attr, val in mod.items():
@@ -110,7 +103,7 @@ def create_safe_import(
             # Check for submodules (e.g. "math.*")
             for allowed in authorized_imports:
                 if allowed.endswith('.*'):
-                    base_module = allowed[:-2]  # Remove trailing ".*"
+                    base_module = allowed[:-2]
                     if name.startswith(base_module + "."):
                         is_allowed = True
                         break
@@ -122,42 +115,3 @@ def create_safe_import(
         return real_import(name, globals, locals, fromlist, level)
 
     return safe_import
-
-
-def apply_system_limits(config: SandboxConfig) -> None:
-    byte_limit = config.max_memory_mb * 1024 * 1024
-    resource.setrlimit(resource.RLIMIT_AS, (byte_limit, byte_limit))
-
-
-def isolated_worker(
-    code: str,
-    config: SandboxConfig,
-    result_queue: 'Queue[str]',
-) -> None:
-    try:
-        apply_system_limits(config)
-        safe_env = create_safe_environment(config)
-        exec(code, safe_env)
-        result_queue.put("Success")
-    except Exception as e:
-        result_queue.put(f"Error : {e}")
-
-
-def execute_with_timeout(code: str, config: SandboxConfig) -> str:
-    # A queue to retrieve the child process result
-    queue: 'Queue[str]' = multiprocessing.Queue()
-    process = multiprocessing.Process(
-        target=isolated_worker,
-        args=(code, config, queue)
-    )
-    process.start()
-    # Wait for the process to finish within the configured timeout
-    process.join(timeout=config.max_execution_time_seconds)
-    if process.is_alive():
-        # Time is up, process is still alive: terminate it
-        process.terminate()
-        process.join()
-        return "Sandbox Error : Timeout exceeded."
-    if not queue.empty():
-        return queue.get()
-    return "Unknown error."
