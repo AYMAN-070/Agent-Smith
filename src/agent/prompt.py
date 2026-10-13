@@ -44,3 +44,6 @@ class Prompt:
                 "topK": 40,
             },
         }
+
+    def model_promt(self, llm_text: str):
+

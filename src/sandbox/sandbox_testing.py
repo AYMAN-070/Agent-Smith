@@ -3,7 +3,6 @@ import sys
 
 
 class LocalSandbox:
-
     def __init__(self, timeout: float = 5.0) -> None:
         self.timeout = timeout
 

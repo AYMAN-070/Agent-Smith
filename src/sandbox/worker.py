@@ -1,8 +1,9 @@
+import io
 import resource
 import sys
-import io
 from multiprocessing.queues import Queue
-from typing import Dict, Any, Optional
+from typing import Any
+
 from src.models import SandboxConfig
 from src.sandbox.guards import create_safe_environment
 
@@ -17,7 +18,7 @@ def isolated_worker(
     code: str,
     config: SandboxConfig,
     queue: Queue,
-    custom_modules: Optional[Dict[str, Any]] = None
+    custom_modules: dict[str, Any] | None = None,
 ) -> None:
     """Executes the code in an isolated environment and captures output."""
     try:
@@ -33,4 +34,4 @@ def isolated_worker(
         queue.put({"status": "success", "output": captured_output.getvalue()})
     except Exception as e:
         sys.stdout = sys.__stdout__
-        queue.put({"status": "error", "error": f"{type(e).__name__}: {str(e)}"})
+        queue.put({"status": "error", "error": f"{type(e).__name__}: {e!s}"})
