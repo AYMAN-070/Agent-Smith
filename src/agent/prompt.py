@@ -27,7 +27,18 @@ class Prompt:
             },
             # User prompt / conversation history
             "contents": [
-                {"role": "user", "parts": [{"text": self.task_definition}]}
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": (
+                                f"{self.task_definition}\n\n"
+                                f"You MUST implement this exact function signature:\n"
+                                f"{self.function}"
+                            )
+                        }
+                    ],
+                }
             ],
             # Generation parameters to tune the output
             "generationConfig": {
@@ -45,5 +56,5 @@ class Prompt:
             },
         }
 
-    def model_promt(self, llm_text: str):
-
+    # def model_prompt(self, llm_text: str):
+    # def trace_prompt(self):

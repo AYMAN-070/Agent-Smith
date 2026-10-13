@@ -6,6 +6,7 @@ class ExtractCode:
         self.text = llm_text
 
     def code(self, llm_text: str) -> str:
+        print(llm_text)
         pattern = r"```(?:python|py)?\s*\n(.*?)```"
         match = re.search(pattern, self.text, re.DOTALL | re.IGNORECASE)
         if match:

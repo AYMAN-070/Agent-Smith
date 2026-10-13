@@ -23,6 +23,17 @@ def llm(prompt: Prompt) -> str:
     headers = {"Content-Type": "application/json"}
     response = requests.post(endpoint, json=payload, headers=headers)
     data = response.json()
+    if "error" in data:
+        print("Erreur retournée par Google API :", data["error"])
+        model = "gemini-3.1-flash-lite"
+        endpoint = (
+            f"{llm_url}/v1beta/models/{model}:generateContent?key={api_key}"
+        )
+        response = requests.post(endpoint, json=payload, headers=headers)
+    data = response.json()
+    if "error" in data:
+        print("Erreur retournée par Google API :", data["error"])
+
     text: str = data["candidates"][0]["content"]["parts"][0]["text"]
     # token = data["usageMetadata"]
     extractor = ExtractCode(text)
