@@ -3,13 +3,13 @@ import os
 import requests
 from dotenv import load_dotenv
 
-from src.agent.parser import ExtractCode
-from src.agent.prompt import Prompt
+from src.agent.parser import CodeParser
+from src.agent.prompt import PromptBuilder
 
 load_dotenv()
 
 
-def llm(prompt: Prompt) -> str:
+def generate_code(prompt: PromptBuilder) -> str:
 
     llm_url = os.getenv("GEMINI_URL")
     keys = [
@@ -36,8 +36,8 @@ def llm(prompt: Prompt) -> str:
 
     text: str = data["candidates"][0]["content"]["parts"][0]["text"]
     # token = data["usageMetadata"]
-    extractor = ExtractCode(text)
-    code = extractor.code(text)
+    extractor = CodeParser(text)
+    code = extractor.parse(text)
     return code
 
     # return (

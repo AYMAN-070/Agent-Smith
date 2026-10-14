@@ -6,6 +6,7 @@ from typing import Any
 
 from src.models import SandboxConfig
 from src.sandbox.guards import create_safe_environment
+from src.sandbox.guards import FinalAnswerException
 
 
 def apply_system_limits(config: SandboxConfig) -> None:
@@ -35,11 +36,13 @@ def isolated_worker(
 
     except FinalAnswerException as fa_exc:
         sys.stdout = sys.__stdout__
-        queue.put({
-            "status": "final_answer",
-            "answer": fa_exc.answer,
-            "output": captured_output.getvalue()
-        })
+        queue.put(
+            {
+                "status": "final_answer",
+                "answer": fa_exc.answer,
+                "output": captured_output.getvalue(),
+            }
+        )
     except Exception as e:
         sys.stdout = sys.__stdout__
         queue.put({"status": "error", "error": f"{type(e).__name__}: {e!s}"})

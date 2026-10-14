@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from src.agent.loop import Loop
+from src.agent.loop import AgentLoop
 from src.models import MBPPTaskInput
 
 
@@ -19,8 +19,8 @@ def main() -> None:
     args = parser.parse_args()
     task_content = Path(args.task_file).read_text(encoding="utf-8")
     task = MBPPTaskInput.model_validate_json(task_content)
-    result = Loop(task)
-    print(result.loop())
+    agent = AgentLoop(task)
+    print(agent.run())
 
 
 if __name__ == "__main__":

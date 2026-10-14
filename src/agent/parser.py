@@ -1,12 +1,11 @@
 import re
 
 
-class ExtractCode:
-    def __init__(self, llm_text) -> None:
+class CodeParser:
+    def __init__(self, llm_text: str) -> None:
         self.text = llm_text
 
-    def code(self, llm_text: str) -> str:
-        print(llm_text)
+    def parse(self, llm_text: str) -> str:
         pattern = r"```(?:python|py)?\s*\n(.*?)```"
         match = re.search(pattern, self.text, re.DOTALL | re.IGNORECASE)
         if match:
