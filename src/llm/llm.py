@@ -38,7 +38,6 @@ def llm(prompt: Prompt) -> str:
     # token = data["usageMetadata"]
     extractor = ExtractCode(text)
     code = extractor.code(text)
-    print(code)
     return code
 
     # return (

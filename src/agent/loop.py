@@ -41,9 +41,13 @@ class Loop:
                 return answer
             else:
                 error_trace = sand_answer.get("error") or sand_answer.get("output", "Test failed")
-                print(f"\n❌ FAILED: Error detected in sandbox:")
+                print("\n" + "!" * 50)
+                print(f"❌ FAILED: Error detected in sandbox at iteration {step}:")
+                print("-" * 50)
                 print(f"{error_trace}")
-                print("\n🔄 Feeding code and error trace back to prompt for next iteration...")
+                print("-" * 50)
+                print("🔄 Feeding code and error trace back to prompt for next iteration...")
+                print("!" * 50 + "\n")
 
                 # Send original answer to model history and error trace to user history
                 self.prompt.model_prompt(answer)

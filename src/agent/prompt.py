@@ -33,8 +33,10 @@ class Prompt:
                         {
                             "text": (
                                 f"{self.task_definition}\n\n"
-                                # f"You MUST implement this exact function signature:\n"
-                                # f"{self.function}"
+                                f"You MUST implement this exact function signature:\n"
+                                f"{self.function}\n\n"
+                                f"Here a assert exemple\n"
+                                f"{'\n'.join(self.test_list)}"
                             )
                         }
                     ],
