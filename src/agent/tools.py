@@ -21,11 +21,16 @@ def create_task_specific_run_test(secret_asserts: list[str]) -> Callable:
             except AssertionError:
                 errors.append(f"Error : {assert_str}")
             except Exception as e:
-                errors.append(f"Execution error '{type(e).__name__}' on : {assert_str}")
+                errors.append(
+                    f"Execution error '{type(e).__name__}' on : {assert_str}"
+                )
 
         if passed == total:
             return f"Success: {passed}/{total} tests passed. You can now call final_answer()."
         else:
-            return f"Failed: {passed}/{total} tests passed.\nDetails:\n" + "\n".join(errors)
+            return (
+                f"Failed: {passed}/{total} tests passed.\nDetails:\n"
+                + "\n".join(errors)
+            )
 
     return run_test

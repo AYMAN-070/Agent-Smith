@@ -1,18 +1,18 @@
 from src.models import MBPPTaskInput
 
 
-class Prompt:
+class PromptBuilder:
     def __init__(self, task: MBPPTaskInput) -> None:
         self.task = task
         self.extract_task()
-        self.prompt_creation()
+        self.build_initial_payload()
 
     def extract_task(self) -> None:
         self.task_definition = self.task.task_definition
         self.function = self.task.function_definition
         self.test_list = self.task.test_list
 
-    def prompt_creation(self) -> None:
+    def build_initial_payload(self) -> None:
         self.payload = {
             # System instructions to define
             # the model's persona, constraints, and behavior
@@ -33,7 +33,8 @@ class Prompt:
                         {
                             "text": (
                                 f"{self.task_definition}\n\n"
-                                f"You MUST implement this exact function signature:\n"
+                                f"You MUST implement this exact "
+                                "function signature:\n"
                                 f"{self.function}\n\n"
                                 f"Here a assert exemple\n"
                                 f"{'\n'.join(self.test_list)}"
@@ -58,19 +59,19 @@ class Prompt:
             },
         }
 
-    def payload_creation(self) -> None:
-        self.parts: dict = {
-            "text": (
-                f"{self.task_definition}\n\n"
-                f"You MUST implement this exact function signature:\n"
-                f"{self.function}"
-            )
-        }
-
-    def model_prompt(self, llm_text: str):
+    def add_model_response(self, llm_text: str) -> None:
         llm_answer: dict = {"role": "model", "parts": [{"text": llm_text}]}
         self.payload["contents"].append(llm_answer)
 
-    def trace_prompt(self, trace: str):
-        llm_answer: dict = {"role": "user", "parts": [{"text": trace}]}
-        self.payload["contents"].append(llm_answer)
+    def add_error_feedback(self, trace: str) -> None:
+        feedback_text = (
+            "The previous code failed when executed in the sandbox.\n\n"
+            f"Error details / traceback:\n{trace}\n\n"
+            "Instructions to fix:\n"
+            "1. Carefully analyze why the error occurred.\n"
+            f"2. Keep the exact function signature: {self.function}\n"
+            "3. Make sure all edge cases and assertions are satisfied.\n"
+            "4. Return ONLY the complete, corrected Python function enclosed in a ```python ... ``` block."
+        )
+        feedback: dict = {"role": "user", "parts": [{"text": feedback_text}]}
+        self.payload["contents"].append(feedback)

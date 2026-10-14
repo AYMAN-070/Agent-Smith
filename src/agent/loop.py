@@ -1,16 +1,16 @@
-from src.agent.prompt import Prompt
-from src.llm.llm import llm
+from src.agent.prompt import PromptBuilder
+from src.llm.llm import generate_code
 from src.models import MBPPTaskInput
 from src.sandbox.executor import SandboxExecutor
 
 
-class Loop:
+class AgentLoop:
     def __init__(self, task: MBPPTaskInput) -> None:
         self.task = task
         self.sandbox = SandboxExecutor()
-        self.prompt = Prompt(task)
+        self.prompt = PromptBuilder(task)
 
-    def loop(self) -> str:
+    def run(self) -> str:
         max_loop = 10
         current_loop = 0
         print("\n" + "=" * 50)
@@ -22,11 +22,11 @@ class Loop:
             print(f"\n--- [ITERATION {step}/{max_loop}] ---")
             
             print("\n🤖 [1/3] Calling LLM with current prompt/history...")
-            answer = llm(self.prompt)
+            answer = generate_code(self.prompt)
             print("\n📥 [LLM Response / Generated Code]:")
             print(answer)
 
-            code_for_sandbox = self.code_to_test(answer)
+            code_for_sandbox = self.prepare_test_script(answer)
             print("\n📦 [2/3] Prepared Code For Sandbox (Function + Tests):")
             print(code_for_sandbox)
 
@@ -50,8 +50,8 @@ class Loop:
                 print("!" * 50 + "\n")
 
                 # Send original answer to model history and error trace to user history
-                self.prompt.model_prompt(answer)
-                self.prompt.trace_prompt(error_trace)
+                self.prompt.add_model_response(answer)
+                self.prompt.add_error_feedback(error_trace)
                 current_loop += 1
 
         print("\n" + "=" * 50)
@@ -59,7 +59,7 @@ class Loop:
         print("=" * 50 + "\n")
         return "didnt succed"
 
-    def code_to_test(self, code: str) -> str:
+    def prepare_test_script(self, code: str) -> str:
         clean_code = code.strip()
         tests = "\n".join(self.prompt.test_list)
         imports = "\n".join(self.task.test_imports)
