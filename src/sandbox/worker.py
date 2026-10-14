@@ -31,6 +31,14 @@ def isolated_worker(
         sys.stdout = sys.__stdout__
 
         queue.put({"status": "success", "output": captured_output.getvalue()})
+
+    except FinalAnswerException as fa_exc:
+        sys.stdout = sys.__stdout__
+        queue.put({
+            "status": "final_answer",
+            "answer": fa_exc.answer,
+            "output": captured_output.getvalue()
+        })
     except Exception as e:
         sys.stdout = sys.__stdout__
         queue.put({"status": "error", "error": f"{type(e).__name__}: {str(e)}"})

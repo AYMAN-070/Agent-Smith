@@ -115,3 +115,13 @@ def create_safe_import(
         return real_import(name, globals, locals, fromlist, level)
 
     return safe_import
+
+
+class FinalAnswerException(Exception):
+    """Exception raised when the agent calls final_answer()."""
+    def __init__(self, answer: Any):
+        self.answer = answer
+
+
+def agent_final_answer(answer: Any) -> None:
+    raise FinalAnswerException(answer)
