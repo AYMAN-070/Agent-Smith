@@ -1,0 +1,34 @@
+"contents": [
+    # 1. Ta demande initiale
+    {
+        "role": "user",
+        "parts": [
+            {
+                "text": "Écris la fonction maximum(a, b)..."
+            }
+        ]
+    },
+
+    # 2. La réponse (le code) que le LLM t'avait renvoyée
+    {
+        "role": "model",
+        "parts": [
+            {
+                "text": code_genere_par_le_llm
+            }
+        ]
+    },
+
+    # 3. Ton retour avec la trace d'erreur de la sandbox
+    {
+        "role": "user",
+        "parts": [
+            {
+                "text": (
+                "L'exécution a échoué dans la sandbox avec l'erreur suivante :\n"
+                f"{sandbox_error_traceback}\n\n""Corrige le code pour faire passer les tests."
+            )
+            }
+        ]
+    }
+]

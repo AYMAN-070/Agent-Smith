@@ -33,8 +33,8 @@ class Prompt:
                         {
                             "text": (
                                 f"{self.task_definition}\n\n"
-                                f"You MUST implement this exact function signature:\n"
-                                f"{self.function}"
+                                # f"You MUST implement this exact function signature:\n"
+                                # f"{self.function}"
                             )
                         }
                     ],
@@ -56,5 +56,19 @@ class Prompt:
             },
         }
 
-    # def model_prompt(self, llm_text: str):
-    # def trace_prompt(self):
+    def payload_creation(self) -> None:
+        self.parts: dict = {
+            "text": (
+                f"{self.task_definition}\n\n"
+                f"You MUST implement this exact function signature:\n"
+                f"{self.function}"
+            )
+        }
+
+    def model_prompt(self, llm_text: str):
+        llm_answer: dict = {"role": "model", "parts": [{"text": llm_text}]}
+        self.payload["contents"].append(llm_answer)
+
+    def trace_prompt(self, trace: str):
+        llm_answer: dict = {"role": "user", "parts": [{"text": trace}]}
+        self.payload["contents"].append(llm_answer)
