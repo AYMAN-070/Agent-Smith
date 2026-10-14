@@ -3,10 +3,10 @@ import resource
 import sys
 from multiprocessing.queues import Queue
 from typing import Any
+import traceback
 
 from src.models import SandboxConfig
-from src.sandbox.guards import create_safe_environment
-from src.sandbox.guards import FinalAnswerException
+from src.sandbox.guards import FinalAnswerException, create_safe_environment
 
 
 def apply_system_limits(config: SandboxConfig) -> None:
@@ -45,4 +45,12 @@ def isolated_worker(
         )
     except Exception as e:
         sys.stdout = sys.__stdout__
-        queue.put({"status": "error", "error": f"{type(e).__name__}: {e!s}"})
+        tb_str = traceback.format_exc()
+        queue.put(
+            {
+                "status": "error",
+                "error": tb_str,
+                "error_type": type(e).__name__,
+                "output": captured_output.getvalue(),
+            }
+        )
