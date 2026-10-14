@@ -1,7 +1,8 @@
 from src.agent.prompt import PromptBuilder
-from src.llm.llm import generate_code
+from src.llm.llm import Llm_request
 from src.models import MBPPTaskInput
 from src.sandbox.executor import SandboxExecutor
+import re
 
 
 class AgentLoop:
@@ -9,6 +10,7 @@ class AgentLoop:
         self.task = task
         self.sandbox = SandboxExecutor()
         self.prompt = PromptBuilder(task)
+        self.llm_request = Llm_request()
 
     def run(self) -> str:
         max_loop = 10
@@ -20,13 +22,13 @@ class AgentLoop:
         while current_loop < max_loop:
             step = current_loop + 1
             print(f"\n--- [ITERATION {step}/{max_loop}] ---")
-            
+
             print("\n🤖 [1/3] Calling LLM with current prompt/history...")
-            answer = generate_code(self.prompt)
+            answer = self.llm_request.generate_code(self.prompt)
             print("\n📥 [LLM Response / Generated Code]:")
             print(answer)
 
-            code_for_sandbox = self.prepare_test_script(answer)
+            code_for_sandbox = self.parse(answer.llm_output)
             print("\n📦 [2/3] Prepared Code For Sandbox (Function + Tests):")
             print(code_for_sandbox)
 
@@ -40,13 +42,19 @@ class AgentLoop:
                 print("=" * 50 + "\n")
                 return answer
             else:
-                error_trace = sand_answer.get("error") or sand_answer.get("output", "Test failed")
+                error_trace = sand_answer.get("error") or sand_answer.get(
+                    "output", "Test failed"
+                )
                 print("\n" + "!" * 50)
-                print(f"❌ FAILED: Error detected in sandbox at iteration {step}:")
+                print(
+                    f"❌ FAILED: Error detected in sandbox at iteration {step}:"
+                )
                 print("-" * 50)
                 print(f"{error_trace}")
                 print("-" * 50)
-                print("🔄 Feeding code and error trace back to prompt for next iteration...")
+                print(
+                    "🔄 Feeding code and error trace back to prompt for next iteration..."
+                )
                 print("!" * 50 + "\n")
 
                 # Send original answer to model history and error trace to user history
@@ -66,3 +74,11 @@ class AgentLoop:
         if imports:
             clean_code = f"{imports}\n\n{clean_code}"
         return f"{clean_code}\n\n{tests}\n"
+
+    def parse(self, code: str) -> str:
+        pattern = r"```(?:python|py)?\s*\n(.*?)```"
+        match = re.search(pattern, code, re.DOTALL | re.IGNORECASE)
+        if match:
+            python_code = match.group(1).strip()
+            return python_code
+        return ""

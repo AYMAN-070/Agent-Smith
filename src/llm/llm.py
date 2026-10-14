@@ -1,47 +1,14 @@
-import os
-
-import requests
-from dotenv import load_dotenv
-
 from src.agent.parser import CodeParser
 from src.agent.prompt import PromptBuilder
+from src.llm.provider import Provider
+from src.models import StepMetrics
 
-load_dotenv()
 
+class Llm_request:
+    def __init__(self) -> None:
+        self.provider = Provider()
 
-def generate_code(prompt: PromptBuilder) -> str:
+    def generate_code(self, prompt: PromptBuilder) -> StepMetrics:
 
-    llm_url = os.getenv("GEMINI_URL")
-    keys = [
-        val for key, val in os.environ.items() if key.startswith("GEMINI_API")
-    ]
-    api_key = keys[0]
-    model = "gemini-3.5-flash-lite"
-    endpoint = f"{llm_url}/v1beta/models/{model}:generateContent?key={api_key}"
-    payload = prompt.payload
-
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(endpoint, json=payload, headers=headers)
-    data = response.json()
-    if "error" in data:
-        print("Erreur retournée par Google API :", data["error"])
-        model = "gemini-3.1-flash-lite"
-        endpoint = (
-            f"{llm_url}/v1beta/models/{model}:generateContent?key={api_key}"
-        )
-        response = requests.post(endpoint, json=payload, headers=headers)
-    data = response.json()
-    if "error" in data:
-        print("Erreur retournée par Google API :", data["error"])
-
-    text: str = data["candidates"][0]["content"]["parts"][0]["text"]
-    # token = data["usageMetadata"]
-    extractor = CodeParser(text)
-    code = extractor.parse(text)
-    return code
-
-    # return (
-    #     f"reponse : {text}\n token of the question"
-    #     f"= {token['promptTokenCount']}\n"
-    #     f"token for the answer = {token['candidatesTokenCount']}"
-    # )
+        data = self.provider.send_request(prompt.payload).json()
+        return StepMetrics(**data)

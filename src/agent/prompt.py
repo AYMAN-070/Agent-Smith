@@ -13,55 +13,65 @@ class PromptBuilder:
         self.test_list = self.task.test_list
 
     def build_initial_payload(self) -> None:
+        formatted_tests = repr(self.test_list)
+        system_instruction = (
+            "You are an autonomous Code Agent solving Python programming tasks.\n"
+            "You operate in a secure execution sandbox where you write and execute Python code.\n\n"
+            "AVAILABLE TOOLS:\n"
+            "1. from agent_tools import run_tests, TESTS\n"
+            "   - TESTS: the list of assertion strings for this task.\n"
+            "   - run_tests(code: str, test_list: list[str]) -> str (JSON):\n"
+            "     Runs candidate code against test assertions and returns a JSON string ('success': bool, 'output': str).\n"
+            "2. final_answer(solution_code: str)\n"
+            "   Call this built-in function to submit your final solution when all tests pass.\n\n"
+            "CRITICAL EXECUTION RULE:\n"
+            "Every response MUST produce observable output in the sandbox. You have ONLY TWO valid response patterns:\n\n"
+            "PATTERN 1 - Testing your candidate solution:\n"
+            "```python\n"
+            "candidate = '''\n"
+            "def your_function(...):\n"
+            "    ...\n"
+            "'''\n"
+            "from agent_tools import run_tests, TESTS\n"
+            "print(run_tests(candidate, TESTS))\n"
+            "```\n\n"
+            "PATTERN 2 - Submitting final solution (ONLY when all tests pass):\n"
+            "```python\n"
+            "final_answer('''def your_function(...):\n"
+            "    ...\n"
+            "''')\n"
+            "```\n\n"
+            "NEVER define a function without either print(run_tests(...)) or final_answer(...).\n"
+            "Output ONLY the python code block enclosed in ```python ... ```."
+        )
+
+        user_content = (
+            f"TASK: {self.task_definition}\n\n"
+            f"REQUIRED FUNCTION SIGNATURE:\n{self.function}\n\n"
+            f"TEST CASES:\ntests = {formatted_tests}\n\n"
+            "Start by testing your candidate implementation."
+        )
+
         self.payload = {
-            # System instructions to define
-            # the model's persona, constraints, and behavior
-            "system_instruction": {
-                "parts": [
-                    {
-                        "text": "You are a professional Python developer."
-                        "Answer concisely and only"
-                        " in Python code when applicable."
-                    }
-                ]
-            },
-            # User prompt / conversation history
-            "contents": [
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_instruction,
+                },
                 {
                     "role": "user",
-                    "parts": [
-                        {
-                            "text": (
-                                f"{self.task_definition}\n\n"
-                                f"You MUST implement this exact "
-                                "function signature:\n"
-                                f"{self.function}\n\n"
-                                f"Here a assert exemple\n"
-                                f"{'\n'.join(self.test_list)}"
-                            )
-                        }
-                    ],
-                }
+                    "content": user_content,
+                },
             ],
-            # Generation parameters to tune the output
-            "generationConfig": {
-                # Lower values result in more deterministic and focused
-                # responses
-                "temperature": 0.2,
-                "maxOutputTokens": 1000,  # Maximum number of tokens
-                # the model can generate
-                # Nucleus sampling: selects tokens whose cumulative probability
-                # reaches P
-                "topP": 0.95,
-                # Top-K sampling: limits selection to the top K most probable
-                # tokens
-                "topK": 40,
-            },
+            "temperature": 0.2,
+            "max_tokens": 1000,
+            "top_p": 0.95,
         }
 
     def add_model_response(self, llm_text: str) -> None:
-        llm_answer: dict = {"role": "model", "parts": [{"text": llm_text}]}
-        self.payload["contents"].append(llm_answer)
+        # In OpenAI format, previous model responses have role 'assistant' and direct 'content'
+        assistant_message: dict = {"role": "assistant", "content": llm_text}
+        self.payload["messages"].append(assistant_message)
 
     def add_error_feedback(self, trace: str) -> None:
         feedback_text = (
@@ -73,5 +83,5 @@ class PromptBuilder:
             "3. Make sure all edge cases and assertions are satisfied.\n"
             "4. Return ONLY the complete, corrected Python function enclosed in a ```python ... ``` block."
         )
-        feedback: dict = {"role": "user", "parts": [{"text": feedback_text}]}
-        self.payload["contents"].append(feedback)
+        feedback: dict = {"role": "user", "content": feedback_text}
+        self.payload["messages"].append(feedback)
