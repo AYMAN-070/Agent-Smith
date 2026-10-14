@@ -11,12 +11,7 @@ dependencies = [
     "dotenv>=0.9.9",
     "flake8>=7.4.1",
     "mypy>=2.4.0",
+    "pydantic>=2.14.1",
     "requests>=2.34.2",
 ]
 
-[project.scripts]
-sandbox = "sandbox.main_sandbox:main"
-
-[build-system]
-requires = ["uv_build>=0.12.21,<0.13.0"]
-build-backend = "uv_build"
