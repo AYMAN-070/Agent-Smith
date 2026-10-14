@@ -20,11 +20,16 @@ def isolated_worker(
     config: SandboxConfig,
     queue: Queue,
     custom_modules: dict[str, Any] | None = None,
+    initial_namespace: dict[str, Any] | None = None,
 ) -> None:
-    """Executes the code in an isolated environment and captures output."""
+    """Executes the code in an isolated environment, captures output and updated namespace."""
     try:
         apply_system_limits(config)
-        safe_env = create_safe_environment(config, custom_modules)
+        safe_env = create_safe_environment(
+            config,
+            custom_modules=custom_modules,
+            initial_namespace=initial_namespace,
+        )
         captured_output = io.StringIO()
         sys.stdout = captured_output
 
@@ -32,7 +37,23 @@ def isolated_worker(
 
         sys.stdout = sys.__stdout__
 
-        queue.put({"status": "success", "output": captured_output.getvalue()})
+        # Extract user variables defined during execution (ignore builtins and special keys)
+        updated_namespace: dict[str, Any] = {}
+        for k, v in safe_env.items():
+            if k not in ("__builtins__", "final_answer"):
+                try:
+                    # Quick check to ensure the object can be pickled across multiprocessing queue
+                    import pickle
+                    pickle.dumps(v)
+                    updated_namespace[k] = v
+                except Exception:
+                    pass
+
+        queue.put({
+            "status": "success",
+            "output": captured_output.getvalue(),
+            "namespace": updated_namespace,
+        })
 
     except FinalAnswerException as fa_exc:
         sys.stdout = sys.__stdout__
