@@ -65,6 +65,7 @@ def create_safe_environment(
 
     return {
         "__builtins__": safe_builtins,
+        "final_answer": agent_final_answer,
     }
 
 
