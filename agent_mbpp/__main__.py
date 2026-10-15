@@ -20,7 +20,7 @@ def main() -> None:
     task_content = Path(args.task_file).read_text(encoding="utf-8")
     task = MBPPTaskInput.model_validate_json(task_content)
     agent = AgentLoop(task)
-    print(agent.run())
+    agent.run()
 
 
 if __name__ == "__main__":
