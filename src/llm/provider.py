@@ -43,6 +43,7 @@ class Provider:
         ]
 
     def send_request(self, payload: dict):
+        retries = 0
         last_error = None
         for provider in self.provider:
             api_keys = [k for k in provider["api_keys"]]
@@ -65,6 +66,7 @@ class Provider:
                             endpoint, json=payload, headers=headers
                         )
                         if response.status_code == 429:
+                            retries += 1
                             print(
                                 f"⚠️ Quota exceeded (429) for model"
                                 f" '{model}'. Skipping to next candidate..."
@@ -73,6 +75,7 @@ class Provider:
                         response.raise_for_status()
                         data = response.json()
                         if "error" in data:
+                            retries += 1
                             print(
                                 f"⚠️ API Error: {data['error'].get('message')}"
                             )
@@ -80,8 +83,10 @@ class Provider:
                         print(
                             f"✅ Success with [{provider['name']}] | Model: {model}"
                         )
-                        return data
+                        data["url"] = provider["base_url"]
+                        return (data, retries)
                     except Exception as err:
+                        retries += 1
                         last_error = err
                         print(
                             f"⚠️ Attempt failed ({err}),"
@@ -92,6 +97,6 @@ class Provider:
         )
 
 
-if __name__ == "__main__":
-    test = Provider()
-    test.send_request({"t": "u"})
+# if __name__ == "__main__":
+#     test = Provider()
+#     test.send_request({"t": "u"})

@@ -14,7 +14,7 @@ class PromptBuilder:
 
     def build_initial_payload(self) -> None:
         formatted_tests = repr(self.test_list)
-        system_instruction = (
+        self.system_instruction = (
             "You are an autonomous Code Agent solving Python programming tasks.\n"
             "You operate in a secure execution sandbox where you write and execute Python code.\n\n"
             "AVAILABLE TOOLS:\n"
@@ -56,7 +56,7 @@ class PromptBuilder:
             "messages": [
                 {
                     "role": "system",
-                    "content": system_instruction,
+                    "content": self.system_instruction,
                 },
                 {
                     "role": "user",
