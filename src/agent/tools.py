@@ -1,36 +1,40 @@
-from typing import Callable
+import json
+from typing import List, Dict, Any
 
 
-def create_task_specific_run_test(secret_asserts: list[str]) -> Callable:
+def run_tests(code: str, test_list: List[str]) -> str:
     """
-    Creates a run_test function specifically tailored for the current LLM task.
-    This is the real tool injected into the Sandbox.
+    Run candidate Python code against a list of test assertions
     """
+    execution_namespace: Dict[str, Any] = {}
+    try:
+        exec(code, execution_namespace)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "output": f"Code execution failed ({type(e).__name__}): {e}"
+        })
 
-    def run_test(target_function: Callable) -> str:
-        passed = 0
-        total = len(secret_asserts)
-        errors = []
+    passed = 0
+    total = len(test_list)
+    failed_details: List[str] = []
 
-        for assert_str in secret_asserts:
-            try:
-                test_env = {target_function.__name__: target_function}
+    for assertion in test_list:
+        try:
+            exec(assertion, execution_namespace)
+            passed += 1
+        except AssertionError:
+            failed_details.append(f"Assertion failed: {assertion}")
+        except Exception as e:
+            failed_details.append(f"Test error on '{assertion}' ({type(e).__name__}): {e}")
 
-                exec(assert_str, test_env)
-                passed += 1
-            except AssertionError:
-                errors.append(f"Error : {assert_str}")
-            except Exception as e:
-                errors.append(
-                    f"Execution error '{type(e).__name__}' on : {assert_str}"
-                )
-
-        if passed == total:
-            return f"Success: {passed}/{total} tests passed. You can now call final_answer()."
-        else:
-            return (
-                f"Failed: {passed}/{total} tests passed.\nDetails:\n"
-                + "\n".join(errors)
-            )
-
-    return run_test
+    if passed == total:
+        return json.dumps({
+            "success": True,
+            "output": f"All {total} tests passed successfully."
+        })
+    else:
+        return json.dumps({
+            "success": False,
+            "output": f"{passed}/{total} tests passed. Failures:\n" + "\n".join(failed_details)
+        })

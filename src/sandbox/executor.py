@@ -10,25 +10,33 @@ class SandboxExecutor:
     def __init__(self, config: Optional[SandboxConfig] = None) -> None:
         self.config: SandboxConfig = config if config is not None else SandboxConfig()
         self.custom_modules: Dict[str, Any] = {}
+        self.session_namespace: Dict[str, Any] = {}
 
     def register_custom_module(self, name: str, module_or_tools: Any) -> None:
         """Register custom module or mock tools for the sandbox."""
         self.custom_modules[name] = module_or_tools
 
+    def reset_session(self) -> None:
+        """Clears the interactive session variables."""
+        self.session_namespace.clear()
+
     def execute(
         self,
         code: str,
         custom_modules: Optional[Dict[str, Any]] = None,
+        persistent_session: bool = False,
     ) -> Dict[str, Any]:
         """Runs the worker process with strict timeout and isolation."""
         merged_modules: Dict[str, Any] = {**self.custom_modules}
         if custom_modules:
             merged_modules.update(custom_modules)
 
+        initial_ns = dict(self.session_namespace) if persistent_session else None
+
         queue = multiprocessing.Queue()
         process = multiprocessing.Process(
             target=isolated_worker,
-            args=(code, self.config, queue, merged_modules),
+            args=(code, self.config, queue, merged_modules, initial_ns),
         )
 
         process.start()
@@ -43,7 +51,10 @@ class SandboxExecutor:
             }
 
         if not queue.empty():
-            return queue.get()
+            res = queue.get()
+            if persistent_session and res.get("status") == "success" and "namespace" in res:
+                self.session_namespace.update(res["namespace"])
+            return res
 
         return {
             "status": "error",

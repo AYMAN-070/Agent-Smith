@@ -75,13 +75,24 @@ class PromptBuilder:
 
     def add_error_feedback(self, trace: str) -> None:
         feedback_text = (
-            "The previous code failed when executed in the sandbox.\n\n"
-            f"Error details / traceback:\n{trace}\n\n"
-            "Instructions to fix:\n"
-            "1. Carefully analyze why the error occurred.\n"
-            f"2. Keep the exact function signature: {self.function}\n"
-            "3. Make sure all edge cases and assertions are satisfied.\n"
-            "4. Return ONLY the complete, corrected Python function enclosed in a ```python ... ``` block."
+            f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n\n"
+            "INSTRUCTIONS FOR NEXT STEP:\n"
+            "1. If tests failed, analyze the failure, correct your algorithm, and RE-TEST using:\n"
+            "   ```python\n"
+            "   candidate = '''\n"
+            "   def your_function(...):\n"
+            "       ...\n"
+            "   '''\n"
+            "   from agent_tools import run_tests, TESTS\n"
+            "   print(run_tests(candidate, TESTS))\n"
+            "   ```\n"
+            "2. If all tests PASSED, call final_answer with your clean function code:\n"
+            "   ```python\n"
+            "   final_answer('''def your_function(...):\n"
+            "       ...\n"
+            "   ''')\n"
+            "   ```\n"
+            "IMPORTANT: Do not just define the function. You MUST either print(run_tests(...)) or call final_answer(...)."
         )
         feedback: dict = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)

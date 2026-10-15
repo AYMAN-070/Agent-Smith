@@ -54,36 +54,33 @@ class Provider:
                         print(
                             f"🔄 Attempting with [{provider['name']}] | Model: {model}"
                         )
-                        if provider["type"] == "gemini_native":
-                            endpoint = (
-                                f"{provider['base_url']}/chat/completions"
-                            )
-                            headers = {
-                                "Authorization": f"Bearer {key}",
-                                "Content-Type": "application/json",
-                            }
-                            payload["model"] = model
-                            response = requests.post(
-                                endpoint, json=payload, headers=headers
-                            )
-                            if response.status_code == 429:
-                                print(
-                                    f"⚠️ Quota exceeded (429) for model"
-                                    f" '{model}'. Skipping to next candidate..."
-                                )
-                                continue
-                            response.raise_for_status()
-                            data = response.json()
-                            if "error" in data:
-                                print(
-                                    f"⚠️ API Error: "
-                                    f"{data['error'].get('message')}"
-                                )
-                                continue
+
+                        endpoint = f"{provider['base_url']}/chat/completions"
+                        headers = {
+                            "Authorization": f"Bearer {key}",
+                            "Content-Type": "application/json",
+                        }
+                        payload["model"] = model
+                        response = requests.post(
+                            endpoint, json=payload, headers=headers
+                        )
+                        if response.status_code == 429:
                             print(
-                                f"✅ Success with [{provider['name']}] | Model: {model}"
+                                f"⚠️ Quota exceeded (429) for model"
+                                f" '{model}'. Skipping to next candidate..."
                             )
-                            return data
+                            continue
+                        response.raise_for_status()
+                        data = response.json()
+                        if "error" in data:
+                            print(
+                                f"⚠️ API Error: {data['error'].get('message')}"
+                            )
+                            continue
+                        print(
+                            f"✅ Success with [{provider['name']}] | Model: {model}"
+                        )
+                        return data
                     except Exception as err:
                         last_error = err
                         print(
