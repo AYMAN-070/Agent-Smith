@@ -11,7 +11,6 @@ ModuleMapping = Mapping[str, types.ModuleType | Mapping[str, Any]]
 def create_safe_environment(
     config: SandboxConfig,
     custom_modules: Any | None = None,
-    initial_namespace: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a restricted execution with safe builtins and imports."""
     safe_builtins: dict[str, Any] = {
@@ -64,13 +63,10 @@ def create_safe_environment(
         config.authorized_imports, custom_modules=custom_modules
     )
 
-    env: dict[str, Any] = {
+    return {
         "__builtins__": safe_builtins,
         "final_answer": agent_final_answer,
     }
-    if initial_namespace:
-        env.update(initial_namespace)
-    return env
 
 
 def create_safe_import(
