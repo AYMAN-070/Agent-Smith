@@ -53,26 +53,25 @@ class PromptBuilder:
         )
 
         self.payload = {
-            "system_instruction": {
-                "parts": [{"text": system_instruction}]
-            },
-            "contents": [
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_instruction,
+                },
                 {
                     "role": "user",
-                    "parts": [{"text": user_content}],
-                }
+                    "content": user_content,
+                },
             ],
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 1000,
-                "topP": 0.95,
-                "topK": 40,
-            },
+            "temperature": 0.2,
+            "max_tokens": 1000,
+            "top_p": 0.95,
         }
 
     def add_model_response(self, llm_text: str) -> None:
-        llm_answer: dict = {"role": "model", "parts": [{"text": llm_text}]}
-        self.payload["contents"].append(llm_answer)
+        # In OpenAI format, previous model responses have role 'assistant' and direct 'content'
+        assistant_message: dict = {"role": "assistant", "content": llm_text}
+        self.payload["messages"].append(assistant_message)
 
     def add_error_feedback(self, trace: str) -> None:
         feedback_text = (
@@ -95,5 +94,5 @@ class PromptBuilder:
             "   ```\n"
             "IMPORTANT: Do not just define the function. You MUST either print(run_tests(...)) or call final_answer(...)."
         )
-        feedback: dict = {"role": "user", "parts": [{"text": feedback_text}]}
-        self.payload["contents"].append(feedback)
+        feedback: dict = {"role": "user", "content": feedback_text}
+        self.payload["messages"].append(feedback)

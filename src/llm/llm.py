@@ -1,47 +1,41 @@
-import os
+import re
+import time
 
-import requests
-from dotenv import load_dotenv
-
-from src.agent.parser import CodeParser
 from src.agent.prompt import PromptBuilder
+from src.llm.provider import Provider
 
-load_dotenv()
+
+class LlmResponse:
+    def __init__(self, data: dict, request_time_ms: float) -> None:
+
+        self.raw_data = data
+        self.request_time_ms = request_time_ms
+        self.model_name: str = data.get("model", "")
+
+        self.llm_output: str = data["choices"][0]["message"]["content"]
+
+        self.code: str = self.parse(self.llm_output)
+
+        usage = data.get("usage", {})
+        self.input_tokens: int = usage.get("prompt_tokens", 0)
+        self.output_tokens: int = usage.get("completion_tokens", 0)
+
+    def parse(self, llm_text) -> str:
+        pattern = r"```(?:python|py)?\s*\n(.*?)```"
+        match = re.search(pattern, llm_text, re.DOTALL | re.IGNORECASE)
+        if match:
+            python_code = match.group(1).strip()
+            return python_code
+        return ""
 
 
-def generate_code(prompt: PromptBuilder) -> str:
+class LlmRequest:
+    def __init__(self) -> None:
+        self.provider = Provider()
 
-    llm_url = os.getenv("GEMINI_URL")
-    keys = [
-        val for key, val in os.environ.items() if key.startswith("GEMINI_API")
-    ]
-    api_key = keys[0]
-    model = "gemini-3.5-flash-lite"
-    endpoint = f"{llm_url}/v1beta/models/{model}:generateContent?key={api_key}"
-    payload = prompt.payload
+    def generate_code(self, prompt: PromptBuilder) -> LlmResponse:
 
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(endpoint, json=payload, headers=headers)
-    data = response.json()
-    if "error" in data:
-        print("Erreur retournée par Google API :", data["error"])
-        model = "gemini-3.1-flash-lite"
-        endpoint = (
-            f"{llm_url}/v1beta/models/{model}:generateContent?key={api_key}"
-        )
-        response = requests.post(endpoint, json=payload, headers=headers)
-    data = response.json()
-    if "error" in data:
-        print("Erreur retournée par Google API :", data["error"])
-
-    text: str = data["candidates"][0]["content"]["parts"][0]["text"]
-    # token = data["usageMetadata"]
-    extractor = CodeParser(text)
-    code = extractor.parse(text)
-    return code
-
-    # return (
-    #     f"reponse : {text}\n token of the question"
-    #     f"= {token['promptTokenCount']}\n"
-    #     f"token for the answer = {token['candidatesTokenCount']}"
-    # )
+        start_time = time.time()
+        data = self.provider.send_request(prompt.payload)
+        request_time_ms = (time.time() - start_time) * 1000.0
+        return LlmResponse(data, request_time_ms)

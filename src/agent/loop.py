@@ -1,8 +1,8 @@
 from src.agent.prompt import PromptBuilder
-from src.llm.llm import generate_code
+from src.agent.tools import run_tests
+from src.llm.llm import LlmRequest
 from src.models import MBPPTaskInput
 from src.sandbox.executor import SandboxExecutor
-from src.agent.tools import run_tests
 
 
 class AgentLoop:
@@ -17,6 +17,7 @@ class AgentLoop:
             },
         )
         self.prompt = PromptBuilder(task)
+        self.llm_request = LlmRequest()
 
     def run(self) -> str:
         max_loop = 10
@@ -30,12 +31,13 @@ class AgentLoop:
             print(f"\n--- [ITERATION {step}/{max_loop}] ---")
 
             print("\n🤖 [1/3] Calling LLM with current prompt/history...")
-            answer = generate_code(self.prompt)
+            llm_response = self.llm_request.generate_code(self.prompt)
+            code_for_sandbox = llm_response.code
             print("\n📥 [LLM Generated Code]:")
-            print(answer)
+            print(code_for_sandbox)
 
             print("⚙️  [2/3] Executing in Sandbox...")
-            sand_answer = self.sandbox.execute(answer)
+            sand_answer = self.sandbox.execute(code_for_sandbox)
             print("\n📤 [Sandbox Result]:", sand_answer)
 
             status = sand_answer.get("status")
@@ -44,7 +46,9 @@ class AgentLoop:
             if status == "final_answer":
                 solution = sand_answer.get("answer")
                 print("\n" + "=" * 50)
-                print(f"✅ SUCCESS: Agent called final_answer at iteration {step}!")
+                print(
+                    f"✅ SUCCESS: Agent called final_answer at iteration {step}!"
+                )
                 print(f"Final Solution:\n{solution}")
                 print("=" * 50 + "\n")
                 return str(solution)
@@ -70,22 +74,31 @@ class AgentLoop:
                         "If tests failed, modify your implementation and re-test with run_tests."
                     )
 
-                self.prompt.add_model_response(answer)
+                self.prompt.add_model_response(code_for_sandbox)
                 self.prompt.add_error_feedback(feedback)
 
             # 3. Execution error or timeout
             else:
-                error_trace = sand_answer.get("error") or "Execution failed without details."
+                error_trace = (
+                    sand_answer.get("error")
+                    or "Execution failed without details."
+                )
                 print("\n" + "!" * 50)
-                print(f"❌ FAILED: Error detected in sandbox at iteration {step}:")
+                print(
+                    f"❌ FAILED: Error detected in sandbox at iteration {step}:"
+                )
                 print("-" * 50)
                 print(f"{error_trace}")
                 print("-" * 50)
-                print("🔄 Feeding code and error trace back to prompt for next iteration...")
+                print(
+                    "🔄 Feeding code and error trace back to prompt for next iteration..."
+                )
                 print("!" * 50 + "\n")
 
-                self.prompt.add_model_response(answer)
-                self.prompt.add_error_feedback(f"Sandbox Error:\n{error_trace}")
+                self.prompt.add_model_response(code_for_sandbox)
+                self.prompt.add_error_feedback(
+                    f"Sandbox Error:\n{error_trace}"
+                )
 
             current_loop += 1
 
