@@ -5,10 +5,13 @@ from src.sandbox.worker import isolated_worker
 
 
 class SandboxExecutor:
-    """Manages code execution inside an isolated worker process with resource limits and timeout."""
+    """Manages code execution inside an isolated
+    worker process with resource limits and timeout."""
 
     def __init__(self, config: Optional[SandboxConfig] = None) -> None:
-        self.config: SandboxConfig = config if config is not None else SandboxConfig()
+        self.config: SandboxConfig = (
+            config if config is not None else SandboxConfig()
+        )
         self.custom_modules: Dict[str, Any] = {}
 
     def register_custom_module(self, name: str, module_or_tools: Any) -> None:

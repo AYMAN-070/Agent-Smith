@@ -1,12 +1,14 @@
 import json
 import shlex
 import subprocess
-import sys
+
+# import sys
 from typing import Any, Dict, List, Optional
 
 
 class MCPClient:
-    """Client for Model Context Protocol (MCP) servers communicating over stdio"""
+    """Client for Model Context Protocol (MCP)
+    servers communicating over stdio"""
 
     def __init__(self, command: str) -> None:
         self.command = command
@@ -32,9 +34,16 @@ class MCPClient:
         self._request_id += 1
         return self._request_id
 
-    def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Send a JSON-RPC 2.0 request and read the response line from stdout."""
-        if not self.process or not self.process.stdin or not self.process.stdout:
+    def _send_request(
+        self, method: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Send a JSON-RPC 2.0 request and read
+        the response line from stdout."""
+        if (
+            not self.process
+            or not self.process.stdin
+            or not self.process.stdout
+        ):
             raise RuntimeError("MCP server process is not running.")
 
         req_id = self._next_id()
@@ -54,7 +63,9 @@ class MCPClient:
         response_line = self.process.stdout.readline()
         if not response_line:
             err = self.process.stderr.read() if self.process.stderr else ""
-            raise RuntimeError(f"MCP server closed unexpectedly. Stderr: {err}")
+            raise RuntimeError(
+                f"MCP server closed unexpectedly. Stderr: {err}"
+            )
 
         response = json.loads(response_line)
         if "error" in response:
@@ -68,7 +79,10 @@ class MCPClient:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "agent_smith_sandbox", "version": "1.0.0"},
+                "clientInfo": {
+                    "name": "agent_smith_sandbox",
+                    "version": "1.0.0",
+                },
             },
         )
         # Discover tools immediately
@@ -87,7 +101,11 @@ class MCPClient:
             {"name": name, "arguments": arguments},
         )
         content_items = result.get("content", [])
-        text_outputs = [item.get("text", "") for item in content_items if item.get("type") == "text"]
+        text_outputs = [
+            item.get("text", "")
+            for item in content_items
+            if item.get("type") == "text"
+        ]
         return "\n".join(text_outputs)
 
     def stop(self) -> None:
@@ -103,7 +121,8 @@ class MCPClient:
 
 
 class HttpMCPClient:
-    """Client for Model Context Protocol (MCP) servers communicating over HTTP."""
+    """Client for Model Context Protocol
+    (MCP) servers communicating over HTTP."""
 
     def __init__(self, server_url: str) -> None:
         self.server_url = server_url.rstrip("/")
@@ -114,7 +133,9 @@ class HttpMCPClient:
         self._request_id += 1
         return self._request_id
 
-    def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _send_request(
+        self, method: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Send a JSON-RPC 2.0 POST request over HTTP."""
         import requests
 
@@ -128,7 +149,9 @@ class HttpMCPClient:
         headers = {"Content-Type": "application/json"}
 
         # Handles standard MCP HTTP endpoints (/mcp or / or direct URL)
-        resp = requests.post(self.server_url, json=payload, headers=headers, timeout=30)
+        resp = requests.post(
+            self.server_url, json=payload, headers=headers, timeout=30
+        )
         resp.raise_for_status()
 
         data = resp.json()
@@ -143,7 +166,10 @@ class HttpMCPClient:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "agent_smith_sandbox_http", "version": "1.0.0"},
+                "clientInfo": {
+                    "name": "agent_smith_sandbox_http",
+                    "version": "1.0.0",
+                },
             },
         )
         self.list_tools()
@@ -161,9 +187,14 @@ class HttpMCPClient:
             {"name": name, "arguments": arguments},
         )
         content_items = result.get("content", [])
-        text_outputs = [item.get("text", "") for item in content_items if item.get("type") == "text"]
+        text_outputs = [
+            item.get("text", "")
+            for item in content_items
+            if item.get("type") == "text"
+        ]
         return "\n".join(text_outputs)
 
     def stop(self) -> None:
-        """No-op for HTTP client since the remote server lifecycle is external."""
+        """No-op for HTTP client since the
+        remote server lifecycle is external."""
         pass

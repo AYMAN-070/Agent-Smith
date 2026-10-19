@@ -4,7 +4,8 @@ from src.mcp.client import MCPClient
 
 def create_tool_wrappers(client: MCPClient) -> Dict[str, Callable[..., Any]]:
     """
-    Dynamically generate callable Python functions for each tool discovered on the MCP server.
+    Dynamically generate callable Python functions
+      for each tool discovered on the MCP server.
 
     According to Agent Smith specification (Section V.2.2 & V.2.4):
     'MCP tools must be callable as Python functions from the sandbox'
@@ -21,7 +22,9 @@ def create_tool_wrappers(client: MCPClient) -> Dict[str, Callable[..., Any]]:
             def wrapper(*args: Any, **kwargs: Any) -> Any:
                 # If positional arguments are passed, map them if possible
                 arguments: Dict[str, Any] = {}
-                properties = tool_schema.get("inputSchema", {}).get("properties", {})
+                properties = tool_schema.get("inputSchema", {}).get(
+                    "properties", {}
+                )
                 param_names = list(properties.keys())
 
                 # Map positional args to schema param names

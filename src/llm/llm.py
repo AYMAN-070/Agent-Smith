@@ -24,7 +24,7 @@ class LlmResponse:
         self.input_tokens: int = usage.get("prompt_tokens", 0)
         self.output_tokens: int = usage.get("completion_tokens", 0)
 
-    def parse(self, llm_text) -> str:
+    def parse(self, llm_text: str) -> str:
         pattern = r"```(?:python|py)?\s*\n(.*?)```"
         match = re.search(pattern, llm_text, re.DOTALL | re.IGNORECASE)
         if match:
