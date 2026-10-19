@@ -74,7 +74,8 @@ class StepMetrics(BaseModel):
     )
     retries: int = Field(
         default=0,
-        description="Number of LLM API retries before getting a successful response",
+        description="Number of LLM API retries"
+        " before getting a successful response",
     )
 
 

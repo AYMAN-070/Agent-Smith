@@ -1,2 +1,0 @@
-"""Agent Smith core package."""
-

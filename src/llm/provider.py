@@ -2,6 +2,7 @@ import os
 
 import requests
 from dotenv import load_dotenv
+from typing import Any
 
 load_dotenv()
 
@@ -42,7 +43,7 @@ class Provider:
             },
         ]
 
-    def send_request(self, payload: dict):
+    def send_request(self, payload: dict) -> tuple[Any, int]:
         retries = 0
         last_error = None
         for provider in self.provider:
@@ -53,7 +54,8 @@ class Provider:
                 for model in provider["models"]:
                     try:
                         print(
-                            f"🔄 Attempting with [{provider['name']}] | Model: {model}"
+                            f"🔄 Attempting with [{provider['name']}]"
+                            f" | Model: {model}"
                         )
 
                         endpoint = f"{provider['base_url']}/chat/completions"
@@ -81,7 +83,8 @@ class Provider:
                             )
                             continue
                         print(
-                            f"✅ Success with [{provider['name']}] | Model: {model}"
+                            f"✅ Success with [{provider['name']}]"
+                            f" | Model: {model}"
                         )
                         data["url"] = provider["base_url"]
                         return (data, retries)
@@ -93,7 +96,8 @@ class Provider:
                             f" falling back to next option..."
                         )
         raise RuntimeError(
-            f"❌ Total LLM cascade failure. Last encountered error: {last_error}"
+            f"❌ Total LLM cascade failure. "
+            f"Last encountered error: {last_error}"
         )
 
 

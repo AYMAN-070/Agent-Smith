@@ -9,7 +9,8 @@ import io
 
 
 def parse_arguments() -> argparse.Namespace:
-    """Parses command line arguments for the Sandbox CLI according to specification."""
+    """Parses command line arguments for
+    the Sandbox CLI according to specification."""
     parser = argparse.ArgumentParser(description="Agent Smith Sandbox CLI")
 
     parser.add_argument(
@@ -34,14 +35,18 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def load_config(config_path: Optional[str]) -> SandboxConfig:
-    """Loads SandboxConfig from a JSON file if provided, otherwise returns default config."""
+    """Loads SandboxConfig from a JSON file if
+    provided, otherwise returns default config."""
     if config_path:
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
             return SandboxConfig.model_validate(config_data)
         except Exception as e:
-            print(f"Error loading configuration file '{config_path}': {e}", file=sys.stderr)
+            print(
+                f"Error loading configuration file '{config_path}': {e}",
+                file=sys.stderr,
+            )
             sys.exit(1)
     return SandboxConfig()
 
@@ -50,7 +55,8 @@ def run_interactive_repl(
     executor: SandboxExecutor,
     custom_modules: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Runs the Read-Eval-Print Loop (REPL) for the sandbox in a persistent safe namespace."""
+    """Runs the Read-Eval-Print Loop (REPL)
+    for the sandbox in a persistent safe namespace."""
 
     print("=== Agent Smith Interactive Sandbox ===")
     print("Type 'exit' or use Ctrl+D to quit.")
@@ -59,9 +65,12 @@ def run_interactive_repl(
     merged_modules = {**executor.custom_modules}
     if custom_modules:
         merged_modules.update(custom_modules)
-    repl_env = create_safe_environment(executor.config, custom_modules=merged_modules)
+    repl_env = create_safe_environment(
+        executor.config, custom_modules=merged_modules
+    )
 
-    # Inject tool functions directly into repl_env so they are accessible as global functions
+    # Inject tool functions directly into
+    #  repl_env so they are accessible as global functions
     if custom_modules:
         for k, v in custom_modules.items():
             if callable(v):
@@ -103,7 +112,9 @@ def run_interactive_repl(
             print("\nExiting sandbox.")
             break
         except KeyboardInterrupt:
-            print("\nKeyboardInterrupt (Ctrl+C). Type 'exit' or Ctrl+D to quit.")
+            print(
+                "\nKeyboardInterrupt (Ctrl+C). Type 'exit' or Ctrl+D to quit."
+            )
 
 
 def main() -> None:
@@ -123,11 +134,17 @@ def main() -> None:
             mcp_client.start()
             tool_wrappers = create_tool_wrappers(mcp_client)
             custom_modules["agent_tools"] = tool_wrappers
-            # Also inject tools directly so they can be called as functions without import
+            # Also inject tools directly so they
+            #  can be called as functions without import
             custom_modules.update(tool_wrappers)
-            print(f"Connected to MCP server via stdio. Tools: {list(tool_wrappers.keys())}")
+            print(
+                f"Connected to MCP server via stdio."
+                f" Tools: {list(tool_wrappers.keys())}"
+            )
         except Exception as e:
-            print(f"Error connecting to MCP server (stdio): {e}", file=sys.stderr)
+            print(
+                f"Error connecting to MCP server (stdio): {e}", file=sys.stderr
+            )
             sys.exit(1)
 
     elif args.mcp_server:
@@ -140,9 +157,14 @@ def main() -> None:
             tool_wrappers = create_tool_wrappers(mcp_client)
             custom_modules["agent_tools"] = tool_wrappers
             custom_modules.update(tool_wrappers)
-            print(f"Connected to MCP server via HTTP ({args.mcp_server}). Tools: {list(tool_wrappers.keys())}")
+            print(
+                f"Connected to MCP server via HTTP ({args.mcp_server})."
+                " Tools: {list(tool_wrappers.keys())}"
+            )
         except Exception as e:
-            print(f"Error connecting to MCP server (HTTP): {e}", file=sys.stderr)
+            print(
+                f"Error connecting to MCP server (HTTP): {e}", file=sys.stderr
+            )
             sys.exit(1)
 
     try:

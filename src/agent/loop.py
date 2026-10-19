@@ -1,9 +1,11 @@
+from pathlib import Path
+from typing import Any
+
 from src.agent.prompt import PromptBuilder
 from src.agent.tools import run_tests
 from src.llm.llm import LlmRequest, LlmResponse
-from src.models import MBPPTaskInput, StepMetrics, SolutionOutput
+from src.models import MBPPTaskInput, SolutionOutput, StepMetrics
 from src.sandbox.executor import SandboxExecutor
-from pathlib import Path
 
 
 class AgentLoop:
@@ -54,7 +56,8 @@ class AgentLoop:
                 solution = sand_answer.get("answer")
                 print("\n" + "=" * 50)
                 print(
-                    f"✅ SUCCESS: Agent called final_answer at iteration {step}!"
+                    f"✅ SUCCESS: Agent called"
+                    f" final_answer at iteration {step}!"
                 )
                 print(f"Final Solution:\n{solution}")
                 print("=" * 50 + "\n")
@@ -75,17 +78,22 @@ class AgentLoop:
 
                 if not observation:
                     feedback = (
-                        "Warning: You defined a function but did NOT print any test results and did NOT call final_answer().\n"
+                        "Warning: You defined a function but did NOT print"
+                        "and any test results and"
+                        " did NOT call final_answer().\n"
                         "To proceed, you MUST either test your function:\n"
                         "  from agent_tools import run_tests, TESTS\n"
                         "  print(run_tests(candidate, TESTS))\n"
-                        "Or call final_answer(solution_code) if you are sure it works."
+                        "Or call final_answer(solution_code)"
+                        " if you are sure it works."
                     )
                 else:
                     feedback = (
                         f"Sandbox Observation (stdout):\n{observation}\n\n"
-                        "If all tests passed, call final_answer(your_solution_code).\n"
-                        "If tests failed, modify your implementation and re-test with run_tests."
+                        "If all tests passed, call"
+                        " final_answer(your_solution_code).\n"
+                        "If tests failed, modify your"
+                        " implementation and re-test with run_tests."
                     )
 
                 self.prompt.add_model_response(code_for_sandbox)
@@ -105,7 +113,8 @@ class AgentLoop:
                 print(f"{error_trace}")
                 print("-" * 50)
                 print(
-                    "🔄 Feeding code and error trace back to prompt for next iteration..."
+                    "🔄 Feeding code and error trace"
+                    " back to prompt for next iteration..."
                 )
                 print("!" * 50 + "\n")
 
@@ -125,8 +134,10 @@ class AgentLoop:
         )
         return
 
-    def record_step(self, llm: LlmResponse, sandbox, step) -> StepMetrics:
-        step = StepMetrics(
+    def record_step(
+        self, llm: LlmResponse, sandbox: dict[str, Any], step: int
+    ) -> StepMetrics:
+        step_metric = StepMetrics(
             step=step,
             input_tokens=llm.input_tokens,
             output_tokens=llm.output_tokens,
@@ -138,18 +149,18 @@ class AgentLoop:
             sandbox_output=sandbox["status"],
             retries=llm.retries,
         )
-        return step
+        return step_metric
 
     def build_solution_output(
-        self, status, solution, steps: list[StepMetrics]
-    ):
+        self, status: bool, solution: str, steps: list[StepMetrics]
+    ) -> SolutionOutput:
         total_iteration = len(steps)
         total_requests = len(steps) + sum(s.retries for s in steps)
         total_input_tokens = sum(s.input_tokens for s in steps)
         total_output_tokens = sum(s.output_tokens for s in steps)
         total_time_seconds = sum(s.request_time_ms for s in steps) / 1000.0
 
-        solution = SolutionOutput(
+        solution_output = SolutionOutput(
             task_id=str(self.task.task_id),
             benchmark="mbpp",
             success=status,
@@ -163,4 +174,4 @@ class AgentLoop:
             system_prompt=self.prompt.system_instruction,
             error=None,
         )
-        return solution
+        return solution_output
