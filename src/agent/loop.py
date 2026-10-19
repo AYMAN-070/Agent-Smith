@@ -4,7 +4,12 @@ from typing import Any
 from src.agent.prompt import PromptBuilder
 from src.agent.tools import run_tests
 from src.llm.llm import LlmRequest, LlmResponse
-from src.models import MBPPTaskInput, SolutionOutput, StepMetrics
+from src.models import (
+    MBPPTaskInput,
+    SolutionOutput,
+    StepMetrics,
+    SWEBenchTaskInput,
+)
 from src.sandbox.executor import SandboxExecutor
 
 
