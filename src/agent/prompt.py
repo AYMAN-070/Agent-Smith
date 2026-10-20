@@ -1,10 +1,16 @@
 from src.models import MBPPTaskInput
-from typing import Any
+from typing import Any, Optional
+from src.sandbox.manual import generate_tools_manual
 
 
 class PromptBuilder:
-    def __init__(self, task: MBPPTaskInput) -> None:
+    def __init__(
+        self,
+        task: MBPPTaskInput,
+        tools_manual: Optional[str] = None,
+    ) -> None:
         self.task = task
+        self.tools_manual = tools_manual
         self.extract_task()
         self.messages: list[dict[str, str]] = []
         self.build_initial_payload()
@@ -16,41 +22,41 @@ class PromptBuilder:
 
     def build_initial_payload(self) -> None:
         formatted_tests = repr(self.test_list)
-        self.system_instruction = (
-            "You are an autonomous Code Agent"
-            " solving Python programming tasks.\n"
-            "You operate in a secure execution sandbox"
-            " where you write and execute Python code.\n\n"
+        manual_section = self.tools_manual or (
             "AVAILABLE TOOLS:\n"
-            "1. from agent_tools import run_tests, TESTS\n"
-            "   - TESTS: the list of assertion strings for this task.\n"
-            "   - run_tests(code: str, test_list: list[str]) -> str (JSON):\n"
-            "     Runs candidate code against test assertions"
-            " and returns a JSON string ('success': bool, 'output': str).\n"
-            "2. final_answer(solution_code: str)\n"
-            "   Call this built-in function to submit"
-            " your final solution when all tests pass.\n\n"
-            "CRITICAL EXECUTION RULE:\n"
-            "Every response MUST produce observable output in the sandbox."
-            " You have ONLY TWO valid response patterns:\n\n"
+            "1. run_tests(code: str, test_list: list[str]) -> dict:\n"
+            "   Runs candidate code against test assertions.\n"
+            "2. final_answer(solution_code: str):\n"
+            "   Call this built-in function to submit your final solution."
+        )
+
+        self.system_instruction = (
+            "You are an autonomous Code Agent solving Python programming tasks.\n"
+            "You operate in a secure execution sandbox where you write and execute Python code.\n\n"
+            f"{manual_section}\n\n"
+            "CRITICAL EXECUTION RULES:\n"
+            "1. All tools are callable directly as global Python functions (no import required).\n"
+            "2. Every response MUST produce observable output in the sandbox.\n"
+            "3. TWO-PHASE DISCIPLINE (STRICT):\n"
+            "   - NEVER call final_answer and run_tests in the same script.\n"
+            "   - Phase 1 (Test): Call run_tests, print the result, and STOP. Wait for the sandbox observation.\n"
+            "   - Phase 2 (Submit): In a subsequent step, once you observe that all tests passed, call final_answer.\n\n"
             "PATTERN 1 - Testing your candidate solution:\n"
             "```python\n"
             "candidate = '''\n"
             "def your_function(...):\n"
             "    ...\n"
             "'''\n"
-            "from agent_tools import run_tests, TESTS\n"
-            "print(run_tests(candidate, TESTS))\n"
+            "res = run_tests(candidate, tests)\n"
+            "print(res)\n"
             "```\n\n"
-            "PATTERN 2 - Submitting final solution"
-            " (ONLY when all tests pass):\n"
+            "PATTERN 2 - Submitting final solution (ONLY in a separate step after tests pass):\n"
             "```python\n"
             "final_answer('''def your_function(...):\n"
             "    ...\n"
             "''')\n"
             "```\n\n"
-            "NEVER define a function without either"
-            " print(run_tests(...)) or final_answer(...).\n"
+            "NEVER combine Pattern 1 and Pattern 2 in the same step.\n"
             "Output ONLY the python code block enclosed in ```python ... ```."
         )
 
@@ -92,8 +98,8 @@ class PromptBuilder:
             "   def your_function(...):\n"
             "       ...\n"
             "   '''\n"
-            "   from agent_tools import run_tests, TESTS\n"
-            "   print(run_tests(candidate, TESTS))\n"
+            "   res = run_tests(candidate, tests)\n"
+            "   print(res)\n"
             "   ```\n"
             "2. If all tests PASSED, call final_answer with"
             " your clean function code:\n"
@@ -110,27 +116,33 @@ class PromptBuilder:
 
 
 class SWEPromptBuilder:
-    def __init__(self, issue_description: str) -> None:
+    def __init__(
+        self,
+        issue_description: str,
+        tools_manual: Optional[str] = None,
+    ) -> None:
         self.issue_description = issue_description
+        self.tools_manual = tools_manual
         self.build_initial_payload()
 
     def build_initial_payload(self) -> None:
+        manual_section = self.tools_manual or (
+            "AVAILABLE TOOLS:\n"
+            "- read_file(filepath: str) -> str\n"
+            "- list_directory(path: str) -> str\n"
+            "- run_command(command: str) -> str\n"
+            "- edit_file(filepath: str, old_text: str, new_text: str) -> str\n"
+            "- final_answer(message: str)"
+        )
         system_instruction = (
             "You are an autonomous Software Engineer Agent solving real-world GitHub issues.\n"
             "You operate in a secure Python sandbox attached to the project's repository.\n\n"
-            "AVAILABLE TOOLS:\n"
-            "1. MCP Tools (imported from agent_tools):\n"
-            "   - read_file(filepath: str) -> str\n"
-            "   - list_directory(path: str) -> str\n"
-            "   - run_command(command: str) -> str  # Runs bash commands like 'pytest' or 'grep'\n"
-            "   - edit_file(filepath: str, old_text: str, new_text: str) -> str\n"
-            "2. final_answer(message: str)\n"
-            "   Call this built-in function to submit your result when you are 100% sure the bug is fixed.\n\n"
-            "CRITICAL EXECUTION RULE:\n"
-            "To interact with the repository, you must write a Python script that uses these tools, prints the result, and wait for the sandbox observation.\n\n"
+            f"{manual_section}\n\n"
+            "CRITICAL EXECUTION RULES:\n"
+            "1. To interact with the repository, you must write a Python script that uses these tools, prints the result, and wait for the sandbox observation.\n"
+            "2. NEVER call final_answer and exploration/edit tools in the same script. Inspect test results first, and call final_answer in a separate step once verified.\n\n"
             "EXAMPLE - Investigating the repository:\n"
             "```python\n"
-            "from agent_tools import list_directory, read_file\n"
             "print(list_directory('.'))\n"
             "print(read_file('main.py'))\n"
             "```\n\n"
