@@ -203,7 +203,8 @@ def find_references(name: str, filepath: str, line: int) -> str:
                         continue
                     if compiled_pattern.search(line_content):
                         results.append(
-                            f"{resolved_file}:{line_nb} {line_content.rstrip()}"
+                            f"{resolved_file}:{line_nb} "
+                            f"{line_content.rstrip()}"
                         )
         except (PermissionError, OSError):
             continue
@@ -245,8 +246,8 @@ def run_tests() -> str:
 
 @mcp.tool()
 def get_patch() -> str:
-    """Retrieve the unified git diff of all changes made to the repository, depending on
-    the implementation."""
+    """Retrieve the unified git diff of all
+    changes made to the repository, depending on the implementation."""
     root_path = Path(TESTBED_PATH).resolve()
     if not root_path.exists():
         return f"Error: Root directory '{root_path}' does not exist."
@@ -260,7 +261,10 @@ def get_patch() -> str:
             cwd=str(root_path),
         )
         if res.returncode != 0:
-            return f"Error generating patch (exit code {res.returncode}): {res.stderr}"
+            return (
+                f"Error generating patch "
+                f"(exit code {res.returncode}): {res.stderr}"
+            )
         return res.stdout
     except subprocess.TimeoutExpired:
         return "Error: git diff timed out (exceeded 30s)."
@@ -280,7 +284,10 @@ def run_command(command: str, workdir: str = "") -> str:
             cwd = Path(TESTBED_PATH) / cwd
 
     if not cwd.exists() or not cwd.is_dir():
-        return f"Error: Working directory '{cwd}' does not exist or is not a directory."
+        return (
+            f"Error: Working directory '{cwd}' "
+            f"does not exist or is not a directory."
+        )
 
     try:
         res = subprocess.run(
