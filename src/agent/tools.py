@@ -1,8 +1,9 @@
 import json
 from typing import List, Dict, Any
+from src.mcp.wrappers import JsonString
 
 
-def run_tests(code: str, test_list: List[str]) -> str:
+def run_tests(code: str, test_list: List[str]) -> JsonString:
     """
     Run candidate Python code against a list of test assertions
     """
@@ -10,11 +11,13 @@ def run_tests(code: str, test_list: List[str]) -> str:
     try:
         exec(code, execution_namespace)
     except Exception as e:
-        return json.dumps(
-            {
-                "success": False,
-                "output": f"Code execution failed ({type(e).__name__}): {e}",
-            }
+        return JsonString(
+            json.dumps(
+                {
+                    "success": False,
+                    "output": f"Code execution failed ({type(e).__name__}): {e}",
+                }
+            )
         )
 
     passed = 0
@@ -33,17 +36,21 @@ def run_tests(code: str, test_list: List[str]) -> str:
             )
 
     if passed == total:
-        return json.dumps(
-            {
-                "success": True,
-                "output": f"All {total} tests passed successfully.",
-            }
+        return JsonString(
+            json.dumps(
+                {
+                    "success": True,
+                    "output": f"All {total} tests passed successfully.",
+                }
+            )
         )
     else:
-        return json.dumps(
-            {
-                "success": False,
-                "output": f"{passed}/{total} tests passed. Failures:\n"
-                + "\n".join(failed_details),
-            }
+        return JsonString(
+            json.dumps(
+                {
+                    "success": False,
+                    "output": f"{passed}/{total} tests passed. Failures:\n"
+                    + "\n".join(failed_details),
+                }
+            )
         )

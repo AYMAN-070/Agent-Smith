@@ -1,5 +1,31 @@
+import json
 from typing import Any, Callable, Dict
 from src.mcp.client import MCPClient
+
+
+class JsonString(str):
+    """String subclass that allows dict-like access if containing valid JSON.
+
+    Supports both string operations (as required by MCP spec) and dict indexing.
+    """
+
+    def __getitem__(self, item: Any) -> Any:
+        try:
+            parsed = json.loads(self)
+            if isinstance(parsed, dict) and isinstance(item, str):
+                return parsed[item]
+        except Exception:
+            pass
+        return super().__getitem__(item)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        try:
+            parsed = json.loads(self)
+            if isinstance(parsed, dict):
+                return parsed.get(key, default)
+        except Exception:
+            pass
+        return default
 
 
 def create_tool_wrappers(client: MCPClient) -> Dict[str, Callable[..., Any]]:
@@ -36,7 +62,8 @@ def create_tool_wrappers(client: MCPClient) -> Dict[str, Callable[..., Any]]:
                 arguments.update(kwargs)
 
                 # Send remote call to MCP server
-                return client.call_tool(name, arguments)
+                raw_result = client.call_tool(name, arguments)
+                return JsonString(raw_result)
 
             wrapper.__name__ = name
             wrapper.__doc__ = tool_schema.get("description", "")
