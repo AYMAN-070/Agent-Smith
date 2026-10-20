@@ -1,16 +1,25 @@
 """Sandbox module according to Agent Smith architecture."""
 
-from src.sandbox.guards import create_safe_environment, create_safe_import
-from src.sandbox.worker import apply_system_limits, isolated_worker
-from src.sandbox.executor import SandboxExecutor, execute_with_timeout
+from src.sandbox.executor import (
+    FinalAnswerException,
+    SAFE_BUILTINS,
+    SandboxExecutor,
+    agent_final_answer,
+    apply_system_limits,
+    create_safe_environment,
+    create_safe_import,
+    isolated_worker,
+)
 from src.sandbox.cli import main as sandbox_cli
 
 __all__ = [
+    "FinalAnswerException",
+    "SAFE_BUILTINS",
+    "SandboxExecutor",
+    "agent_final_answer",
+    "apply_system_limits",
     "create_safe_environment",
     "create_safe_import",
-    "apply_system_limits",
     "isolated_worker",
-    "SandboxExecutor",
-    "execute_with_timeout",
     "sandbox_cli",
 ]
