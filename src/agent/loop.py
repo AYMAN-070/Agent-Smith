@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from src.agent.prompt import PromptBuilder
+from src.agent.prompt import SWEPromptBuilder
 from src.agent.tools import run_tests
 from src.llm.llm import LlmRequest, LlmResponse
 from src.models import (
@@ -133,50 +134,92 @@ class AgentLoop:
         print("\n" + "=" * 50)
         print("⚠️ FAILURE: Max iterations reached without solving the task.")
         print("=" * 50 + "\n")
-        solu = self.build_solution_output(True, str(solution), steps_metric)
-        Path("solution.json").write_text(
-            solu.model_dump_json(indent=2), encoding="utf-8"
-        )
-        return
+        return "didnt succeed"
 
-    def record_step(
-        self, llm: LlmResponse, sandbox: dict[str, Any], step: int
-    ) -> StepMetrics:
-        step_metric = StepMetrics(
-            step=step,
-            input_tokens=llm.input_tokens,
-            output_tokens=llm.output_tokens,
-            request_time_ms=llm.request_time_ms,
-            api_url=llm.url,
-            model_name=llm.model_name,
-            llm_output=llm.llm_output,
-            sandbox_input=llm.code,
-            sandbox_output=sandbox["status"],
-            retries=llm.retries,
-        )
-        return step_metric
 
-    def build_solution_output(
-        self, status: bool, solution: str, steps: list[StepMetrics]
-    ) -> SolutionOutput:
-        total_iteration = len(steps)
-        total_requests = len(steps) + sum(s.retries for s in steps)
-        total_input_tokens = sum(s.input_tokens for s in steps)
-        total_output_tokens = sum(s.output_tokens for s in steps)
-        total_time_seconds = sum(s.request_time_ms for s in steps) / 1000.0
+class SWEAgentLoop:
+    def __init__(self, issue_description: str, sandbox: SandboxExecutor) -> None:
+        """
+        Initializes the loop for the Software Engineering Agent.
+        mcp_tools: A dictionary of tools (read_file, run_command, etc.) provided by Dev A's MCP Client.
+        """
+        self.issue_description = issue_description
+        self.sandbox = sandbox
+        self.prompt = SWEPromptBuilder(issue_description)
+        self.llm_request = LlmRequest()
 
-        solution_output = SolutionOutput(
-            task_id=str(self.task.task_id),
-            benchmark="mbpp",
-            success=status,
-            solution=solution,
-            iterations=total_iteration,
-            total_requests=total_requests,
-            total_input_tokens=total_input_tokens,
-            total_output_tokens=total_output_tokens,
-            total_time_seconds=total_time_seconds,
-            steps=steps,
-            system_prompt=self.prompt.system_instruction,
-            error=None,
-        )
-        return solution_output
+    def run(self) -> str:
+        max_loop = 30
+        current_loop = 0
+        print("\n" + "=" * 50)
+        print("🛠️ START SWE AGENT LOOP")
+        print("=" * 50)
+
+        while current_loop < max_loop:
+            step = current_loop + 1
+            print(f"\n--- [SWE ITERATION {step}/{max_loop}] ---")
+
+            print("\n🤖 [1/3] Calling LLM with current prompt/history...")
+            llm_response = self.llm_request.generate_code(self.prompt)
+            code_for_sandbox = llm_response.code
+            print("\n📥 [LLM Generated Code]:")
+            print(code_for_sandbox)
+
+            print("⚙️  [2/3] Executing in Sandbox...")
+            sand_answer = self.sandbox.execute(code_for_sandbox)
+            print("\n📤 [Sandbox Result]:", sand_answer)
+
+            status = sand_answer.get("status")
+
+            # 1. Final answer submitted by the agent
+            if status == "final_answer":
+                solution = sand_answer.get("answer")
+                print("\n" + "=" * 50)
+                print(f"✅ SUCCESS: Agent resolved the issue at iteration {step}!")
+                print(f"Final Message:\n{solution}")
+                print("=" * 50 + "\n")
+                return str(solution)
+
+            # 2. Code ran successfully (Agent used tools and printed results)
+            elif status == "success":
+                observation = sand_answer.get("output", "").strip()
+                print("\n👁️  [Observation Output]:")
+                print(observation if observation else "(No stdout output)")
+
+                if not observation:
+                    feedback = (
+                        "Warning: Your code executed but produced no output. "
+                        "Remember to use print() to see the results of your tools (e.g., print(read_file('main.py'))). "
+                        "If you are finished, call final_answer('done')."
+                    )
+                else:
+                    feedback = (
+                        f"Sandbox Observation (stdout):\n{observation}\n\n"
+                        "Analyze this output. Call another tool if you need more info, "
+                        "or call final_answer('done') if the bug is fixed and tests pass."
+                    )
+
+                self.prompt.add_model_response(code_for_sandbox)
+                self.prompt.add_feedback(feedback)
+
+            # 3. Execution error in the agent's script
+            else:
+                error_trace = sand_answer.get("error") or "Unknown execution error."
+                print("\n" + "!" * 50)
+                print(f"❌ FAILED: Error detected in sandbox at iteration {step}:")
+                print(f"{error_trace}")
+                print("!" * 50 + "\n")
+
+                self.prompt.add_model_response(code_for_sandbox)
+                self.prompt.add_feedback(
+                    f"[ATTENTION: Itération {step}/{max_loop}]\n"
+                    f"Erreur d'exécution :\n{error_trace}\n"
+                    "Corrige ton code et essaie encore. Dépêche-toi, tu n'as plus beaucoup d'essais !"
+                )
+
+            current_loop += 1
+
+        print("\n" + "=" * 50)
+        print("⚠️ FAILURE: Max iterations reached. The agent got stuck.")
+        print("=" * 50 + "\n")
+        return "FAILED"

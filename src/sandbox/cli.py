@@ -4,8 +4,6 @@ import sys
 from typing import Any, Dict, Optional
 from src.models import SandboxConfig
 from src.sandbox.executor import SandboxExecutor
-from src.sandbox.guards import create_safe_environment, FinalAnswerException
-import io
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -55,30 +53,13 @@ def run_interactive_repl(
     executor: SandboxExecutor,
     custom_modules: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Runs the Read-Eval-Print Loop (REPL)
-    for the sandbox in a persistent safe namespace."""
+    """Runs the Read-Eval-Print Loop (REPL) for the sandbox in an isolated worker process."""
 
     print("=== Agent Smith Interactive Sandbox ===")
     print("Type 'exit' or use Ctrl+D to quit.")
 
-    # Create one persistent safe namespace for the entire REPL session
-    merged_modules = {**executor.custom_modules}
-    if custom_modules:
-        merged_modules.update(custom_modules)
-    repl_env = create_safe_environment(
-        executor.config, custom_modules=merged_modules
-    )
-
-    # Inject tool functions directly into
-    #  repl_env so they are accessible as global functions
-    if custom_modules:
-        for k, v in custom_modules.items():
-            if callable(v):
-                repl_env[k] = v
-            elif isinstance(v, dict):
-                for sub_k, sub_v in v.items():
-                    if callable(sub_v):
-                        repl_env[sub_k] = sub_v
+    persistent_env: Dict[str, Any] = {}
+    code_preamble: list[str] = []
 
     while True:
         try:
@@ -89,24 +70,37 @@ def run_interactive_repl(
             if not user_code.strip():
                 continue
 
-            captured_stdout = io.StringIO()
-            old_stdout = sys.stdout
-            try:
-                sys.stdout = captured_stdout
-                exec(user_code, repl_env)
-            except FinalAnswerException as fa:
-                sys.stdout = old_stdout
-                print(f"final_answer captured: {fa.answer}")
-            except Exception as e:
-                sys.stdout = old_stdout
-                print(f"Error: {type(e).__name__}: {e}", file=sys.stderr)
+            # Prepend accumulated function/class definitions if any
+            full_code = (
+                "\n".join(code_preamble + [user_code])
+                if code_preamble
+                else user_code
+            )
+
+            result = executor.execute(
+                full_code,
+                custom_modules=custom_modules,
+                env=persistent_env,
+            )
+
+            status = result.get("status")
+            if status == "final_answer":
+                print(f"final_answer captured: {result.get('answer')}")
+            elif status == "error":
+                print(f"Error: {result.get('error')}", file=sys.stderr)
             else:
-                sys.stdout = old_stdout
-                out = captured_stdout.getvalue()
+                out = result.get("output", "")
                 if out:
                     print(out, end="" if out.endswith("\n") else "\n")
-            finally:
-                sys.stdout = old_stdout
+
+                # If execution succeeded, persist returned variables
+                if "env" in result:
+                    persistent_env.update(result["env"])
+
+                # If user defined a function or class, retain in preamble
+                stripped = user_code.strip()
+                if stripped.startswith(("def ", "class ")):
+                    code_preamble.append(user_code)
 
         except EOFError:
             print("\nExiting sandbox.")
