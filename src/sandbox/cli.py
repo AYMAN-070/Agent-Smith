@@ -114,58 +114,34 @@ def run_interactive_repl(
 def main() -> None:
     args = parse_arguments()
     config = load_config(args.config_file)
+
     executor = SandboxExecutor(config=config)
 
-    mcp_client = None
-    custom_modules: dict = {}
-
-    if args.mcp_stdio:
-        from src.mcp.client import MCPClient
-        from src.mcp.wrappers import create_tool_wrappers
-
-        try:
-            mcp_client = MCPClient(args.mcp_stdio)
-            mcp_client.start()
-            tool_wrappers = create_tool_wrappers(mcp_client)
-            custom_modules["agent_tools"] = tool_wrappers
-            # Also inject tools directly so they
-            #  can be called as functions without import
-            custom_modules.update(tool_wrappers)
-            print(
-                f"Connected to MCP server via stdio."
-                f" Tools: {list(tool_wrappers.keys())}"
+    try:
+        executor.connect_mcp(
+            stdio_cmd=args.mcp_stdio, server_url=args.mcp_server
+        )
+        if executor.mcp_client:
+            tools_list = list(
+                executor.custom_modules.get("agent_tools", {}).keys()
             )
-        except Exception as e:
-            print(
-                f"Error connecting to MCP server (stdio): {e}", file=sys.stderr
+            transport_info = (
+                f"HTTP ({args.mcp_server})"
+                if args.mcp_server
+                else "stdio"
             )
-            sys.exit(1)
-
-    elif args.mcp_server:
-        from src.mcp.client import HttpMCPClient
-        from src.mcp.wrappers import create_tool_wrappers
-
-        try:
-            mcp_client = HttpMCPClient(args.mcp_server)
-            mcp_client.start()
-            tool_wrappers = create_tool_wrappers(mcp_client)
-            custom_modules["agent_tools"] = tool_wrappers
-            custom_modules.update(tool_wrappers)
             print(
-                f"Connected to MCP server via HTTP ({args.mcp_server})."
-                " Tools: {list(tool_wrappers.keys())}"
+                f"Connected to MCP server via {transport_info}."
+                f" Tools: {tools_list}"
             )
-        except Exception as e:
-            print(
-                f"Error connecting to MCP server (HTTP): {e}", file=sys.stderr
-            )
-            sys.exit(1)
+    except Exception as e:
+        print(f"Error connecting to MCP server: {e}", file=sys.stderr)
+        sys.exit(1)
 
     try:
-        run_interactive_repl(executor, custom_modules=custom_modules)
+        run_interactive_repl(executor)
     finally:
-        if mcp_client:
-            mcp_client.stop()
+        executor.close()
 
 
 if __name__ == "__main__":

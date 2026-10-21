@@ -5,8 +5,6 @@ import sys
 from pathlib import Path
 
 from src.agent.loop import SWEAgentLoop
-from src.mcp.client import HttpMCPClient, MCPClient
-from src.mcp.wrappers import create_tool_wrappers
 from src.sandbox.executor import SandboxExecutor
 
 
@@ -64,49 +62,32 @@ def load_issue(filepath: str) -> str:
 
 def main() -> None:
     print("===" * 15)
-    print("🤖 STARTING SWE-BENCH AGENT")
+    print("STARTING SWE-BENCH AGENT")
     print("===" * 15)
 
     args = parse_arguments()
     issue_description = load_issue(args.task_file)
 
-    mcp_client = None
+    sandbox = SandboxExecutor()
+
     if args.mcp_server:
-        mcp_client = HttpMCPClient(args.mcp_server)
-        mcp_client.start()
+        sandbox.connect_mcp(server_url=args.mcp_server)
     elif args.mcp_stdio:
-        mcp_client = MCPClient(args.mcp_stdio)
-        mcp_client.start()
+        sandbox.connect_mcp(stdio_cmd=args.mcp_stdio)
     else:
         root_dir = Path(__file__).resolve().parent.parent
-        server_script = root_dir / "mcp_tools_swebench.py"
-        if not server_script.exists():
-            print(
-                f"Error: MCP server script not found at {server_script}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        mcp_client = MCPClient(f"python3 {server_script}")
-        mcp_client.start()
+        default_server = root_dir / "mcp_tools_swebench.py"
+        sandbox.connect_mcp(stdio_cmd=f"python3 {default_server}")
 
     try:
-        mcp_tools = create_tool_wrappers(mcp_client)
-
-        sandbox = SandboxExecutor()
-        sandbox.register_custom_module("agent_tools", mcp_tools)
-        sandbox.custom_modules.update(mcp_tools)
-
         agent_loop = SWEAgentLoop(
             issue_description=issue_description,
             sandbox=sandbox,
-            mcp_client=mcp_client,
         )
         result = agent_loop.run()
         print("\n🏁 FINAL RESULT:", result)
-
     finally:
-        if mcp_client:
-            mcp_client.stop()
+        sandbox.close()
 
 
 if __name__ == "__main__":
