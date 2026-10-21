@@ -1,7 +1,7 @@
 import re
 import time
 
-from src.agent.prompt import PromptBuilder
+from src.agent.prompt import PromptBuilder, SWEPromptBuilder
 from src.llm.provider import Provider
 
 
@@ -34,12 +34,14 @@ class LlmResponse:
 
 
 class LlmRequest:
-    def __init__(self, model: str|None, providier: str|None) -> None:
-        self.provider = Provider(model,provider)
+    def __init__(
+        self, model: str | None = None, provider: str | None = None
+    ) -> None:
+        self.provider = Provider(model, provider)
 
-    def generate_code(self, prompt: PromptBuilder) -> LlmResponse:
+    def generate_code(self, prompt: SWEPromptBuilder) -> LlmResponse:
 
         start_time = time.time()
         data, retries = self.provider.send_request(prompt.payload)
         request_time_ms = (time.time() - start_time) * 1000.0
-        return LlmResponse(data, request_time_ms, retries)|
+        return LlmResponse(data, request_time_ms, retries)
