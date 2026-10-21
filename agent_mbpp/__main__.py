@@ -2,9 +2,6 @@ import argparse
 from pathlib import Path
 
 from src.agent.loop import MBPPAgentLoop
-from src.agent.tools import run_tests
-from src.mcp.client import HttpMCPClient, MCPClient
-from src.mcp.wrappers import create_tool_wrappers
 from src.models import MBPPTaskInput
 from src.sandbox.executor import SandboxExecutor
 
@@ -55,43 +52,22 @@ def main() -> None:
     task_content = Path(args.task_file).read_text(encoding="utf-8")
     task = MBPPTaskInput.model_validate_json(task_content)
 
-    mcp_client = None
+    sandbox = SandboxExecutor()
+
     if args.mcp_server:
-        mcp_client = HttpMCPClient(args.mcp_server)
-        mcp_client.start()
+        sandbox.connect_mcp(server_url=args.mcp_server)
     elif args.mcp_stdio:
-        mcp_client = MCPClient(args.mcp_stdio)
-        mcp_client.start()
+        sandbox.connect_mcp(stdio_cmd=args.mcp_stdio)
     else:
         root_dir = Path(__file__).resolve().parent.parent
-        server_script = root_dir / "mcp_tools_mbpp.py"
-        if server_script.exists():
-            mcp_client = MCPClient(f"python3 {server_script}")
-            mcp_client.start()
+        default_server = root_dir / "mcp_tools_mbpp.py"
+        sandbox.connect_mcp(stdio_cmd=f"python3 {default_server}")
 
     try:
-        sandbox = SandboxExecutor()
-
-        if mcp_client and getattr(mcp_client, "tools", None):
-            tool_wrappers = create_tool_wrappers(mcp_client)
-        else:
-            tool_wrappers = {
-                "run_tests": run_tests,
-                "TESTS": task.test_list,
-            }
-
-        sandbox.register_custom_module("agent_tools", tool_wrappers)
-        sandbox.custom_modules.update(tool_wrappers)
-
-        agent = MBPPAgentLoop(
-            task=task,
-            sandbox=sandbox,
-            mcp_client=mcp_client,
-        )
+        agent = MBPPAgentLoop(task=task, sandbox=sandbox)
         agent.run()
     finally:
-        if mcp_client:
-            mcp_client.stop()
+        sandbox.close()
 
 
 if __name__ == "__main__":

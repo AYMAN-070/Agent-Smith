@@ -229,6 +229,48 @@ class SandboxExecutor:
             config if config is not None else SandboxConfig()
         )
         self.custom_modules: Dict[str, Any] = {}
+        self.mcp_client: Any = None
+
+    def connect_mcp(
+        self,
+        stdio_cmd: Optional[str] = None,
+        server_url: Optional[str] = None,
+    ) -> None:
+        """Connects to an MCP server (stdio or HTTP) and registers tools in sandbox."""
+        if server_url:
+            from src.mcp.client import HttpMCPClient
+
+            self.mcp_client = HttpMCPClient(server_url)
+            self.mcp_client.start()
+        elif stdio_cmd:
+            from src.mcp.client import MCPClient
+
+            self.mcp_client = MCPClient(stdio_cmd)
+            self.mcp_client.start()
+
+        if self.mcp_client and getattr(self.mcp_client, "tools", None):
+            from src.mcp.wrappers import create_tool_wrappers
+
+            tool_wrappers = create_tool_wrappers(self.mcp_client)
+            self.register_custom_module("agent_tools", tool_wrappers)
+            self.custom_modules.update(tool_wrappers)
+
+    def close(self) -> None:
+        """Terminates connected MCP server client cleanly if running."""
+        if self.mcp_client:
+            self.mcp_client.stop()
+            self.mcp_client = None
+
+    def __enter__(self) -> "SandboxExecutor":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
+        self.close()
 
     def register_custom_module(self, name: str, module_or_tools: Any) -> None:
         """Register custom module or mock tools for the sandbox."""
