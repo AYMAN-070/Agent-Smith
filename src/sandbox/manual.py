@@ -56,7 +56,9 @@ DEFAULT_MBPP_TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def generate_tools_manual(tools: Sequence[Mapping[str, Any]] | None = None) -> str:
+def generate_tools_manual(
+    tools: Sequence[Mapping[str, Any]] | None = None,
+) -> str:
     """Dynamically generates documentation for all available tools
 
     to be injected into the LLM system prompt.
@@ -65,7 +67,10 @@ def generate_tools_manual(tools: Sequence[Mapping[str, Any]] | None = None) -> s
     resolved_tools = tools if tools is not None else DEFAULT_MBPP_TOOLS
     lines: list[str] = [
         "AVAILABLE TOOLS IN SANDBOX:",
-        "All tools are available as global Python functions (no import required).",
+        (
+            "All tools are available as global"
+            " Python functions (no import required)."
+        ),
         "",
     ]
 
@@ -92,7 +97,7 @@ def generate_tools_manual(tools: Sequence[Mapping[str, Any]] | None = None) -> s
         "Call this function to submit your final answer and complete the task."
     )
     lines.append(
-        "For MBPP: pass the python solution string. For SWE-bench: pass the git patch."
+        "For MBPP: pass the python solution"
+        " string. For SWE-bench: pass the git patch."
     )
-
     return "\n".join(lines)

@@ -129,7 +129,8 @@ def create_safe_environment(
     config: SandboxConfig,
     custom_modules: Any | None = None,
 ) -> dict[str, Any]:
-    """Create a restricted execution environment with safe builtins and imports."""
+    """Create a restricted execution environment
+    with safe builtins and imports."""
     builtins_dict = dict(SAFE_BUILTINS)
     builtins_dict["__import__"] = create_safe_import(
         config.authorized_imports, custom_modules=custom_modules
@@ -154,6 +155,7 @@ def create_safe_environment(
 
 #  ISOLATED WORKER & RESOURCE LIMITS
 
+
 def apply_system_limits(config: SandboxConfig) -> None:
     """Apply memory limit to the current process via resource.setrlimit."""
     byte_limit = config.max_memory_mb * 1024 * 1024
@@ -167,7 +169,8 @@ def isolated_worker(
     custom_modules: dict[str, Any] | None = None,
     env: dict[str, Any] | None = None,
 ) -> None:
-    """Executes code in an isolated process, enforces limits, and returns results."""
+    """Executes code in an isolated process,
+    enforces limits, and returns results."""
     captured_output = io.StringIO()
     try:
         apply_system_limits(config)
@@ -183,6 +186,7 @@ def isolated_worker(
         sys.stdout = sys.__stdout__
 
         import pickle
+
         updated_env: dict[str, Any] = {}
         for k, v in safe_env.items():
             if k.startswith("__") or k == "final_answer":
@@ -195,34 +199,42 @@ def isolated_worker(
             except Exception:
                 pass
 
-        queue.put({
-            "status": "success",
-            "output": captured_output.getvalue(),
-            "env": updated_env,
-        })
+        queue.put(
+            {
+                "status": "success",
+                "output": captured_output.getvalue(),
+                "env": updated_env,
+            }
+        )
 
     except FinalAnswerException as fa_exc:
         sys.stdout = sys.__stdout__
-        queue.put({
-            "status": "final_answer",
-            "answer": fa_exc.answer,
-            "output": captured_output.getvalue(),
-        })
+        queue.put(
+            {
+                "status": "final_answer",
+                "answer": fa_exc.answer,
+                "output": captured_output.getvalue(),
+            }
+        )
     except Exception as e:
         sys.stdout = sys.__stdout__
         tb_str = traceback.format_exc()
-        queue.put({
-            "status": "error",
-            "error": tb_str,
-            "error_type": type(e).__name__,
-            "output": captured_output.getvalue(),
-        })
+        queue.put(
+            {
+                "status": "error",
+                "error": tb_str,
+                "error_type": type(e).__name__,
+                "output": captured_output.getvalue(),
+            }
+        )
 
 
 # SANDBOX EXECUTOR (Supervisor with Process & Timeout)
 
+
 class SandboxExecutor:
-    """Manages code execution inside an isolated worker process with strict timeout."""
+    """Manages code execution inside an isolated
+    worker process with strict timeout."""
 
     def __init__(self, config: Optional[SandboxConfig] = None) -> None:
         self.config: SandboxConfig = (

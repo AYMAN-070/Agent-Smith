@@ -11,6 +11,8 @@ from src.models import (
     SWEBenchTaskInput,
 )
 from src.sandbox.executor import SandboxExecutor
+from src.mcp.client import MCPClient
+from src.mcp.wrappers import create_tool_wrappers
 from src.sandbox.manual import generate_tools_manual
 
 
@@ -25,7 +27,8 @@ class MBPPAgentLoop:
 
         tools = (
             sandbox.mcp_client.tools
-            if sandbox.mcp_client and getattr(sandbox.mcp_client, "tools", None)
+            if sandbox.mcp_client
+            and getattr(sandbox.mcp_client, "tools", None)
             else None
         )
         tools_manual = generate_tools_manual(tools)
@@ -194,26 +197,20 @@ AgentLoop = MBPPAgentLoop
 class SWEAgentLoop:
     def __init__(
         self,
-        issue_description: str,
+        task: SWEBenchTaskInput,
         sandbox: SandboxExecutor,
+        llm: LlmRequest,
     ) -> None:
         """
         Initializes the loop for the Software Engineering Agent.
         """
-        self.issue_description = issue_description
+        self.issue_description = task.hints_text
         self.sandbox = sandbox
-
-        tools = (
-            sandbox.mcp_client.tools
-            if sandbox.mcp_client and getattr(sandbox.mcp_client, "tools", None)
-            else None
-        )
-        tools_manual = generate_tools_manual(tools) if tools else None
+        tools_manual = sandbox.custom_modules
 
         self.prompt = SWEPromptBuilder(
-            issue_description, tools_manual=tools_manual
+            self.issue_description, tools_manual=tools_manual
         )
-        self.llm_request = LlmRequest()
 
     def run(self) -> str:
         max_loop = 30
@@ -242,7 +239,9 @@ class SWEAgentLoop:
             if status == "final_answer":
                 solution = sand_answer.get("answer")
                 print("\n" + "=" * 50)
-                print(f"✅ SUCCESS: Agent resolved the issue at iteration {step}!")
+                print(
+                    f"✅ SUCCESS: Agent resolved the issue at iteration {step}!"
+                )
                 print(f"Final Message:\n{solution}")
                 print("=" * 50 + "\n")
                 return str(solution)
@@ -271,9 +270,13 @@ class SWEAgentLoop:
 
             # 3. Execution error in the agent's script
             else:
-                error_trace = sand_answer.get("error") or "Unknown execution error."
+                error_trace = (
+                    sand_answer.get("error") or "Unknown execution error."
+                )
                 print("\n" + "!" * 50)
-                print(f"❌ FAILED: Error detected in sandbox at iteration {step}:")
+                print(
+                    f"❌ FAILED: Error detected in sandbox at iteration {step}:"
+                )
                 print(f"{error_trace}")
                 print("!" * 50 + "\n")
 

@@ -8,40 +8,47 @@ load_dotenv()
 
 
 class Provider:
-    def __init__(self) -> None:
-        gemini_keys = [
-            val
-            for key, val in os.environ.items()
-            if key.startswith("GEMINI_API")
-        ]
-        openai_keys = [
-            val for key, val in os.environ.items() if key.startswith("OPEN")
-        ]
-        groq_keys = [
-            val for key, val in os.environ.items() if key.startswith("GROQ")
-        ]
-        self.provider = [
-            {
-                "name": "Gemini",
-                "base_url": (
-                    "https://generativelanguage.googleapis.com/v1beta/openai"
-                ),
-                "api_keys": gemini_keys,
-                "models": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
-            },
-            {
-                "name": "OpenRouter",
-                "base_url": "https://openrouter.ai/api/v1",
-                "api_keys": openai_keys,
-                "models": ["meta-llama/llama-3.3-70b-instruct"],
-            },
-            {
-                "name": "Groq",
-                "base_url": "https://api.groq.com/openai/v1",
-                "api_keys": groq_keys,
-                "models": ["llama-3.3-70b-versatile"],
-            },
-        ]
+    def __init__(self, model:str|None, provider:str|None) -> None:
+        if model and provider:
+            self.provider = {"base_url": (
+                                provider
+                            ),
+                            "models": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]}
+        else:
+
+            gemini_keys = [
+                val
+                for key, val in os.environ.items()
+                if key.startswith("GEMINI_API")
+            ]
+            openai_keys = [
+                val for key, val in os.environ.items() if key.startswith("OPEN")
+            ]
+            groq_keys = [
+                val for key, val in os.environ.items() if key.startswith("GROQ")
+            ]
+            self.provider = [
+                {
+                    "name": "Gemini",
+                    "base_url": (
+                        "https://generativelanguage.googleapis.com/v1beta/openai"
+                    ),
+                    "api_keys": gemini_keys,
+                    "models": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
+                },
+                {
+                    "name": "OpenRouter",
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "api_keys": openai_keys,
+                    "models": ["meta-llama/llama-3.3-70b-instruct"],
+                },
+                {
+                    "name": "Groq",
+                    "base_url": "https://api.groq.com/openai/v1",
+                    "api_keys": groq_keys,
+                    "models": ["llama-3.3-70b-versatile"],
+                },
+            ]
 
     def send_request(self, payload: dict) -> tuple[Any, int]:
         retries = 0
@@ -99,6 +106,9 @@ class Provider:
             f"❌ Total LLM cascade failure. "
             f"Last encountered error: {last_error}"
         )
+
+    def cli(self):
+
 
 
 # if __name__ == "__main__":
