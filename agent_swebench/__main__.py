@@ -23,6 +23,7 @@ def main():
     task = SWEBenchTaskInput.model_validate_json(task_content)
 
     sandbox = SandboxExecutor()
+    llm = LlmRequest(parser.model_name, parser.provider_url)
 
     agent_loop = SWEAgentLoop(task, sandbox, llm)
 

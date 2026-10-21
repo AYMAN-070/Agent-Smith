@@ -35,7 +35,7 @@ class LlmResponse:
 
 class LlmRequest:
     def __init__(self, model: str|None, providier: str|None) -> None:
-        self.provider = Provider()
+        self.provider = Provider(model,provider)
 
     def generate_code(self, prompt: PromptBuilder) -> LlmResponse:
 
