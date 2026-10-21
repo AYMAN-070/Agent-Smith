@@ -188,3 +188,67 @@ class SWEPromptBuilder:
         )
         feedback: dict = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)
+
+
+class SWEPromptBuilder:
+    def __init__(self, issue_description: str) -> None:
+        self.issue_description = issue_description
+        self.build_initial_payload()
+
+    def build_initial_payload(self) -> None:
+        system_instruction = (
+            "You are an autonomous Software Engineer Agent solving real-world GitHub issues.\n"
+            "You operate in a secure Python sandbox attached to the project's repository.\n\n"
+            "AVAILABLE TOOLS:\n"
+            "1. MCP Tools (imported from agent_tools):\n"
+            "   - read_file(filepath: str) -> str\n"
+            "   - list_directory(path: str) -> str\n"
+            "   - run_command(command: str) -> str  # Runs bash commands like 'pytest' or 'grep'\n"
+            "   - edit_file(filepath: str, old_text: str, new_text: str) -> str\n"
+            "2. final_answer(message: str)\n"
+            "   Call this built-in function to submit your result when you are 100% sure the bug is fixed.\n\n"
+            "CRITICAL EXECUTION RULE:\n"
+            "To interact with the repository, you must write a Python script that uses these tools, prints the result, and wait for the sandbox observation.\n\n"
+            "EXAMPLE - Investigating the repository:\n"
+            "```python\n"
+            "from agent_tools import list_directory, read_file\n"
+            "print(list_directory('.'))\n"
+            "print(read_file('main.py'))\n"
+            "```\n\n"
+            "EXAMPLE - Submitting final solution:\n"
+            "```python\n"
+            "final_answer('The bug in utils.py is fixed and tests are passing.')\n"
+            "```\n\n"
+            "Output ONLY the python code block enclosed in ```python ... ```."
+        )
+
+        user_content = (
+            f"ISSUE DESCRIPTION:\n{self.issue_description}\n\n"
+            "Start by exploring the repository to find where the bug is located. Write your first Python script to list directories or read files."
+        )
+
+        self.payload = {
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_content},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 1500,
+            "top_p": 0.95,
+        }
+
+    def add_model_response(self, llm_text: str) -> None:
+        assistant_message: dict = {"role": "assistant", "content": llm_text}
+        self.payload["messages"].append(assistant_message)
+
+    def add_feedback(self, trace: str) -> None:
+        feedback_text = (
+            f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n\n"
+            "INSTRUCTIONS FOR NEXT STEP:\n"
+            "Analyze the output above. If you need more information, write another Python script using `read_file` or `run_command`.\n"
+            "If you found the bug, use `edit_file` to fix it.\n"
+            "If you are finished and tests pass, call `final_answer('done')`.\n"
+            "Remember: Output ONLY valid python code enclosed in ```python ... ```."
+        )
+        feedback: dict = {"role": "user", "content": feedback_text}
+        self.payload["messages"].append(feedback)

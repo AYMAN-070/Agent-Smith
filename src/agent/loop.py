@@ -159,6 +159,7 @@ class MBPPAgentLoop:
         )
         return "didnt succeed"
 
+<<<<<<< Updated upstream
     def record_step(
         self, llm: LlmResponse, sandbox: dict[str, Any], step: int
     ) -> StepMetrics:
@@ -247,6 +248,21 @@ class SWEAgentLoop:
     def run(self) -> str:
         start_time = time.time()
         steps_metric: list[StepMetrics] = []
+=======
+
+class SWEAgentLoop:
+    def __init__(self, issue_description: str, sandbox: SandboxExecutor) -> None:
+        """
+        Initializes the loop for the Software Engineering Agent.
+        mcp_tools: A dictionary of tools (read_file, run_command, etc.) provided by Dev A's MCP Client.
+        """
+        self.issue_description = issue_description
+        self.sandbox = sandbox
+        self.prompt = SWEPromptBuilder(issue_description)
+        self.llm_request = LlmRequest()
+
+    def run(self) -> str:
+>>>>>>> Stashed changes
         max_loop = 30
         current_loop = 0
         print("\n" + "=" * 50)
@@ -266,14 +282,18 @@ class SWEAgentLoop:
             print("⚙️  [2/3] Executing in Sandbox...")
             sand_answer = self.sandbox.execute(code_for_sandbox)
             print("\n📤 [Sandbox Result]:", sand_answer)
+<<<<<<< Updated upstream
             steps_metric.append(
                 self.record_step(llm_response, sand_answer, step)
             )
+=======
+>>>>>>> Stashed changes
 
             status = sand_answer.get("status")
 
             # 1. Final answer submitted by the agent
             if status == "final_answer":
+<<<<<<< Updated upstream
                 solution = sand_answer.get("answer", "")
                 print("\n" + "=" * 50)
                 print(
@@ -306,6 +326,13 @@ class SWEAgentLoop:
                 Path(self.output_path).write_text(
                     solu.model_dump_json(indent=2), encoding="utf-8"
                 )
+=======
+                solution = sand_answer.get("answer")
+                print("\n" + "=" * 50)
+                print(f"✅ SUCCESS: Agent resolved the issue at iteration {step}!")
+                print(f"Final Message:\n{solution}")
+                print("=" * 50 + "\n")
+>>>>>>> Stashed changes
                 return str(solution)
 
             # 2. Code ran successfully (Agent used tools and printed results)
@@ -316,16 +343,27 @@ class SWEAgentLoop:
 
                 if not observation:
                     feedback = (
+<<<<<<< Updated upstream
                         "Warning: Your code executed with no output. "
                         "Remember to print() tool results.\n"
                         "When done and tests pass, call "
                         "final_answer(get_patch())."
+=======
+                        "Warning: Your code executed but produced no output. "
+                        "Remember to use print() to see the results of your tools (e.g., print(read_file('main.py'))). "
+                        "If you are finished, call final_answer('done')."
+>>>>>>> Stashed changes
                     )
                 else:
                     feedback = (
                         f"Sandbox Observation (stdout):\n{observation}\n\n"
+<<<<<<< Updated upstream
                         "Analyze this output. Call another tool if needed, "
                         "or call final_answer(get_patch()) if tests pass."
+=======
+                        "Analyze this output. Call another tool if you need more info, "
+                        "or call final_answer('done') if the bug is fixed and tests pass."
+>>>>>>> Stashed changes
                     )
 
                 self.prompt.add_model_response(code_for_sandbox)
@@ -333,6 +371,7 @@ class SWEAgentLoop:
 
             # 3. Execution error in the agent's script
             else:
+<<<<<<< Updated upstream
                 error_trace = (
                     sand_answer.get("error") or "Unknown execution error."
                 )
@@ -340,19 +379,31 @@ class SWEAgentLoop:
                 print(
                     f"❌ FAILED: Error detected in sandbox at iteration {step}:"
                 )
+=======
+                error_trace = sand_answer.get("error") or "Unknown execution error."
+                print("\n" + "!" * 50)
+                print(f"❌ FAILED: Error detected in sandbox at iteration {step}:")
+>>>>>>> Stashed changes
                 print(f"{error_trace}")
                 print("!" * 50 + "\n")
 
                 self.prompt.add_model_response(code_for_sandbox)
                 self.prompt.add_feedback(
+<<<<<<< Updated upstream
                     f"[Iteration {step}/{max_loop}]\n"
                     f"Execution error:\n{error_trace}\n"
                     "Fix your code and try again."
+=======
+                    f"[ATTENTION: Itération {step}/{max_loop}]\n"
+                    f"Erreur d'exécution :\n{error_trace}\n"
+                    "Corrige ton code et essaie encore. Dépêche-toi, tu n'as plus beaucoup d'essais !"
+>>>>>>> Stashed changes
                 )
 
             current_loop += 1
 
         print("\n" + "=" * 50)
+<<<<<<< Updated upstream
         print("⚠️ FAILURE: Max iterations reached without solving the task.")
         print("=" * 50 + "\n")
         solu = self.build_solution_output(
@@ -417,3 +468,8 @@ class SWEAgentLoop:
             error=error,
         )
         return solution_output
+=======
+        print("⚠️ FAILURE: Max iterations reached. The agent got stuck.")
+        print("=" * 50 + "\n")
+        return "FAILED"
+>>>>>>> Stashed changes
