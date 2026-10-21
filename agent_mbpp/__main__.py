@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import shlex
 
 from src.agent.loop import MBPPAgentLoop
 from src.models import MBPPTaskInput
@@ -61,10 +62,17 @@ def main() -> None:
     else:
         root_dir = Path(__file__).resolve().parent.parent
         default_server = root_dir / "mcp_tools_mbpp.py"
-        sandbox.connect_mcp(stdio_cmd=f"python3 {default_server}")
+        cmd = f"python3 {shlex.quote(str(default_server))}"
+        sandbox.connect_mcp(stdio_cmd=cmd)
 
     try:
-        agent = MBPPAgentLoop(task=task, sandbox=sandbox)
+        agent = MBPPAgentLoop(
+            task=task,
+            sandbox=sandbox,
+            output_path=args.output,
+            model_name=args.model_name,
+            provider_url=args.provider_url,
+        )
         agent.run()
     finally:
         sandbox.close()

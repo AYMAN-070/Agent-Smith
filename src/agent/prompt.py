@@ -128,39 +128,44 @@ class SWEPromptBuilder:
     def build_initial_payload(self) -> None:
         manual_section = self.tools_manual or (
             "AVAILABLE TOOLS:\n"
-            "- read_file(filepath: str) -> str\n"
-            "- list_directory(path: str) -> str\n"
-            "- run_command(command: str) -> str\n"
-            "- edit_file(filepath: str, old_text: str, new_text: str) -> str\n"
-            "- final_answer(message: str)"
+            "- read_file(filepath: str, start_line: int, end_line: int) -> str\n"
+            "- list_files(directory: str, pattern: str) -> str\n"
+            "- search_code(pattern: str, file_pattern: str) -> str\n"
+            "- edit_file(filepath: str, old_str: str, new_str: str) -> str\n"
+            "- run_tests() -> str\n"
+            "- get_patch() -> str\n"
+            "- run_command(command: str, workdir: str) -> str\n"
+            "- final_answer(patch_diff: str)"
         )
-        system_instruction = (
+        self.system_instruction = (
             "You are an autonomous Software Engineer Agent solving real-world GitHub issues.\n"
             "You operate in a secure Python sandbox attached to the project's repository.\n\n"
             f"{manual_section}\n\n"
             "CRITICAL EXECUTION RULES:\n"
             "1. To interact with the repository, you must write a Python script that uses these tools, prints the result, and wait for the sandbox observation.\n"
-            "2. NEVER call final_answer and exploration/edit tools in the same script. Inspect test results first, and call final_answer in a separate step once verified.\n\n"
+            "2. NEVER call final_answer and exploration/edit tools in the same script. Inspect test results first, and call final_answer in a separate step once verified.\n"
+            "3. When you have fixed the bug and verified with run_tests(), retrieve and submit your patch using:\n"
+            "   final_answer(get_patch())\n\n"
             "EXAMPLE - Investigating the repository:\n"
             "```python\n"
-            "print(list_directory('.'))\n"
-            "print(read_file('main.py'))\n"
+            "print(list_files('.', '*.py'))\n"
+            "print(read_file('main.py', 1, 50))\n"
             "```\n\n"
             "EXAMPLE - Submitting final solution:\n"
             "```python\n"
-            "final_answer('The bug in utils.py is fixed and tests are passing.')\n"
+            "final_answer(get_patch())\n"
             "```\n\n"
             "Output ONLY the python code block enclosed in ```python ... ```."
         )
 
         user_content = (
             f"ISSUE DESCRIPTION:\n{self.issue_description}\n\n"
-            "Start by exploring the repository to find where the bug is located. Write your first Python script to list directories or read files."
+            "Start by exploring the repository to find where the bug is located. Write your first Python script to search or read files."
         )
 
         self.payload = {
             "messages": [
-                {"role": "system", "content": system_instruction},
+                {"role": "system", "content": self.system_instruction},
                 {"role": "user", "content": user_content},
             ],
             "temperature": 0.2,
@@ -176,9 +181,9 @@ class SWEPromptBuilder:
         feedback_text = (
             f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n\n"
             "INSTRUCTIONS FOR NEXT STEP:\n"
-            "Analyze the output above. If you need more information, write another Python script using `read_file` or `run_command`.\n"
-            "If you found the bug, use `edit_file` to fix it.\n"
-            "If you are finished and tests pass, call `final_answer('done')`.\n"
+            "Analyze the output above. If you need more information, write another Python script using `read_file`, `search_code`, or `run_command`.\n"
+            "If you found the bug, use `edit_file` to fix it and verify with `run_tests()`.\n"
+            "If tests pass and the fix is verified, retrieve and submit your patch with `final_answer(get_patch())`.\n"
             "Remember: Output ONLY valid python code enclosed in ```python ... ```."
         )
         feedback: dict = {"role": "user", "content": feedback_text}

@@ -1,32 +1,42 @@
 import os
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
-from typing import Any
 
 load_dotenv()
 
 
 class Provider:
-    def __init__(self, model:str|None, provider:str|None) -> None:
-        if model and provider:
-            self.provider = {"base_url": (
-                                provider
-                            ),
-                            "models": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]}
-        else:
+    def __init__(
+        self, model: str | None = None, provider: str | None = None
+    ) -> None:
+        gemini_keys = [
+            val
+            for key, val in os.environ.items()
+            if key.startswith("GEMINI_API")
+        ]
+        openai_keys = [
+            val for key, val in os.environ.items() if key.startswith("OPEN")
+        ]
+        groq_keys = [
+            val for key, val in os.environ.items() if key.startswith("GROQ")
+        ]
 
-            gemini_keys = [
-                val
-                for key, val in os.environ.items()
-                if key.startswith("GEMINI_API")
+        if model and provider:
+            keys = gemini_keys or openai_keys or groq_keys
+            self.provider = [
+                {
+                    "name": "Custom",
+                    "base_url": provider,
+                    "api_keys": keys,
+                    "models": [
+                        "gemini-3.5-flash-lite",
+                        "gemini-3.1-flash-lite",
+                    ],
+                }
             ]
-            openai_keys = [
-                val for key, val in os.environ.items() if key.startswith("OPEN")
-            ]
-            groq_keys = [
-                val for key, val in os.environ.items() if key.startswith("GROQ")
-            ]
+        else:
             self.provider = [
                 {
                     "name": "Gemini",
@@ -34,7 +44,10 @@ class Provider:
                         "https://generativelanguage.googleapis.com/v1beta/openai"
                     ),
                     "api_keys": gemini_keys,
-                    "models": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
+                    "models": [
+                        "gemini-3.5-flash-lite",
+                        "gemini-3.1-flash-lite",
+                    ],
                 },
                 {
                     "name": "OpenRouter",
@@ -106,11 +119,3 @@ class Provider:
             f"❌ Total LLM cascade failure. "
             f"Last encountered error: {last_error}"
         )
-
-    def cli(self):
-
-
-
-# if __name__ == "__main__":
-#     test = Provider()
-#     test.send_request({"t": "u"})
