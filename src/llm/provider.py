@@ -100,6 +100,9 @@ class Provider:
             f"Last encountered error: {last_error}"
         )
 
+    def cli(self):
+
+
 
 # if __name__ == "__main__":
 #     test = Provider()

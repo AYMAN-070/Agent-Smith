@@ -34,12 +34,16 @@ def format_tool_signature(tool: Mapping[str, Any]) -> str:
     return f"{name}({params_joined})"
 
 
-def generate_tools_manual(tools: Sequence[Mapping[str, Any]] | None = None) -> str:
-    """Dynamically generates documentation for all available tools
-    """
+def generate_tools_manual(
+    tools: Sequence[Mapping[str, Any]] | None = None,
+) -> str:
+    """Dynamically generates documentation for all available tools"""
     lines: list[str] = [
         "AVAILABLE TOOLS IN SANDBOX:",
-        "All tools are available as global Python functions (no import required).",
+        (
+            "All tools are available as global"
+            " Python functions (no import required)."
+        ),
         "",
     ]
 
@@ -56,7 +60,7 @@ def generate_tools_manual(tools: Sequence[Mapping[str, Any]] | None = None) -> s
                 for p_name, p_info in props.items():
                     p_desc = p_info.get("description", "")
                     lines.append(
-                        f"     - {p_name} ({p_info.get('type', 'Any')}): {p_desc}"
+                        f"- {p_name} ({p_info.get('type', 'Any')}): {p_desc}"
                     )
             lines.append("")
 
@@ -67,7 +71,7 @@ def generate_tools_manual(tools: Sequence[Mapping[str, Any]] | None = None) -> s
         "Call this function to submit your final answer and complete the task."
     )
     lines.append(
-        "For MBPP: pass the python solution string. For SWE-bench: pass the git patch."
+        "For MBPP: pass the python solution"
+        " string. For SWE-bench: pass the git patch."
     )
-
     return "\n".join(lines)

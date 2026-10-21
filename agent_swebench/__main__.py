@@ -1,44 +1,31 @@
-import json
+import argparse
 import os
-import sys
-from src.sandbox.executor import SandboxExecutor
+from pathlib import Path
+from src.cli import AgentArgs
+
 from src.agent.loop import SWEAgentLoop
 from src.mcp.client import MCPClient
-
-
-def load_issue(filepath: str) -> str:
-    """LOad bug description from JSON file"""
-    if not os.path.exists(filepath):
-        print(f"Error: Could not find {filepath}")
-        sys.exit(1)
-
-    with open(filepath, 'r') as f:
-        data = json.load(f)
-        return data.get("problem_statement", "No description provided.")
+from src.models import SWEBenchTaskInput
+from src.sandbox.executor import SandboxExecutor
+from src.llm.llm import LlmRequest
 
 
 def main():
-    print("===" * 15)
-    print("🤖 STARTING SWE-BENCH AGENT")
-    print("===" * 15)
+    parser = AgentArgs("Agent SWE")
+    task_content = Path(parser.task_file).read_text(encoding="utf-8")
 
     current_dir = os.path.dirname(__file__)
-    task_path = os.path.join(current_dir, "..", "task.json")
-    issue_description = load_issue(task_path)
-
     server_script_path = os.path.join(current_dir, "..", "mcp_swe_server.py")
     mcp_client = MCPClient(server_script_path)
     mcp_client.start()
+    llm_request = LlmRequest(parser.model_name, parser.provider_url)
 
-    mcp_tools = mcp_client.get_wrapped_tools()
+    task = SWEBenchTaskInput.model_validate_json(task_content)
 
     sandbox = SandboxExecutor()
-    sandbox.register_custom_module("agent_tools", mcp_tools)
 
-    agent_loop = SWEAgentLoop(
-        issue_description=issue_description,
-        sandbox=sandbox
-    )
+    agent_loop = SWEAgentLoop(task, sandbox, llm)
+
     result = agent_loop.run()
 
     mcp_client.stop()

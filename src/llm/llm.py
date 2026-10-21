@@ -34,7 +34,7 @@ class LlmResponse:
 
 
 class LlmRequest:
-    def __init__(self) -> None:
+    def __init__(self, model: str|None, providier: str|None) -> None:
         self.provider = Provider()
 
     def generate_code(self, prompt: PromptBuilder) -> LlmResponse:
@@ -42,4 +42,4 @@ class LlmRequest:
         start_time = time.time()
         data, retries = self.provider.send_request(prompt.payload)
         request_time_ms = (time.time() - start_time) * 1000.0
-        return LlmResponse(data, request_time_ms, retries)
+        return LlmResponse(data, request_time_ms, retries)|
