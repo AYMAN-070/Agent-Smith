@@ -21,14 +21,14 @@ class MBPPAgentLoop:
         self,
         task: MBPPTaskInput,
         sandbox: SandboxExecutor,
-        mcp_client: Any = None,
     ) -> None:
         self.task = task
         self.sandbox = sandbox
 
         tools = (
-            mcp_client.tools
-            if mcp_client and getattr(mcp_client, "tools", None)
+            sandbox.mcp_client.tools
+            if sandbox.mcp_client
+            and getattr(sandbox.mcp_client, "tools", None)
             else None
         )
         tools_manual = generate_tools_manual(tools)

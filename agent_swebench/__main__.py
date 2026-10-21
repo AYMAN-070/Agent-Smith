@@ -30,8 +30,7 @@ def main():
     result = agent_loop.run()
 
     finally:
-        if mcp_client:
-            mcp_client.stop()
+        sandbox.close()
 
 
 if __name__ == "__main__":
