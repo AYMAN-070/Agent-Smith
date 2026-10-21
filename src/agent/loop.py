@@ -1,8 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from src.agent.prompt import PromptBuilder
-from src.agent.prompt import SWEPromptBuilder
+from src.agent.prompt import PromptBuilder, SWEPromptBuilder
 from src.agent.tools import run_tests
 from src.llm.llm import LlmRequest, LlmResponse
 from src.models import (
@@ -17,50 +16,22 @@ from src.mcp.wrappers import create_tool_wrappers
 from src.sandbox.manual import generate_tools_manual
 
 
-class AgentLoop:
-    def __init__(self, task: MBPPTaskInput, mcp_client: Any = None) -> None:
+class MBPPAgentLoop:
+    def __init__(
+        self,
+        task: MBPPTaskInput,
+        sandbox: SandboxExecutor,
+        mcp_client: Any = None,
+    ) -> None:
         self.task = task
-        self.sandbox = SandboxExecutor()
+        self.sandbox = sandbox
 
-        if mcp_client and getattr(mcp_client, "tools", None):
-            from src.mcp.wrappers import create_tool_wrappers
-            from src.sandbox.manual import generate_tools_manual
-
-            tool_wrappers = create_tool_wrappers(mcp_client)
-            self.sandbox.register_custom_module("agent_tools", tool_wrappers)
-            self.sandbox.custom_modules.update(tool_wrappers)
-            tools_manual = generate_tools_manual(mcp_client.tools)
-        else:
-            from src.agent.tools import run_tests
-            from src.sandbox.manual import generate_tools_manual
-
-            tool_wrappers = {
-                "run_tests": run_tests,
-                "TESTS": self.task.test_list,
-            }
-            self.sandbox.register_custom_module("agent_tools", tool_wrappers)
-            self.sandbox.custom_modules.update(tool_wrappers)
-            sample_schema = [
-                {
-                    "name": "run_tests",
-                    "description": "Runs candidate code against test assertions.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "code": {
-                                "type": "string",
-                                "description": "Candidate code string",
-                            },
-                            "test_list": {
-                                "type": "array",
-                                "description": "List of assert strings",
-                            },
-                        },
-                        "required": ["code", "test_list"],
-                    },
-                }
-            ]
-            tools_manual = generate_tools_manual(sample_schema)
+        tools = (
+            mcp_client.tools
+            if mcp_client and getattr(mcp_client, "tools", None)
+            else None
+        )
+        tools_manual = generate_tools_manual(tools)
 
         self.prompt = PromptBuilder(task, tools_manual=tools_manual)
         self.llm_request = LlmRequest()
@@ -218,6 +189,9 @@ class AgentLoop:
             error=None,
         )
         return solution_output
+
+
+AgentLoop = MBPPAgentLoop
 
 
 class SWEAgentLoop:

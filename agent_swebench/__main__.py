@@ -28,8 +28,9 @@ def main():
 
     result = agent_loop.run()
 
-    mcp_client.stop()
-    print("\n🏁 FINAL RESULT:", result)
+    finally:
+        if mcp_client:
+            mcp_client.stop()
 
 
 if __name__ == "__main__":
