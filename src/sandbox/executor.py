@@ -267,6 +267,7 @@ class SandboxExecutor:
             tool_wrappers = create_tool_wrappers(self.mcp_client)
             self.register_custom_module("agent_tools", tool_wrappers)
             self.custom_modules.update(tool_wrappers)
+            self.tools = self.get_tools_manual()
 
     def get_tools_manual(self) -> str:
         """Returns the documentation manual for all tools available in the sandbox."""
