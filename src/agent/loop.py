@@ -11,7 +11,6 @@ from src.models import (
     SWEBenchTaskInput,
 )
 from src.sandbox.executor import SandboxExecutor
-from src.sandbox.manual import generate_tools_manual
 
 
 class MBPPAgentLoop:
@@ -26,16 +25,7 @@ class MBPPAgentLoop:
         self.task = task
         self.sandbox = sandbox
         self.output_path = output_path
-
-        tools = (
-            sandbox.mcp_client.tools
-            if sandbox.mcp_client
-            and getattr(sandbox.mcp_client, "tools", None)
-            else None
-        )
-        tools_manual = generate_tools_manual(tools)
-
-        self.prompt = PromptBuilder(task, tools_manual=tools_manual)
+        self.prompt = PromptBuilder(task, tools_manual=sandbox.tools)
         self.llm_request = LlmRequest(model_name, provider_url)
 
     def run(self) -> str:
@@ -230,17 +220,8 @@ class SWEAgentLoop:
         self.sandbox = sandbox
         self.output_path = output_path
         self.issue_description = task.problem_statement
-
-        tools = (
-            sandbox.mcp_client.tools
-            if sandbox.mcp_client
-            and getattr(sandbox.mcp_client, "tools", None)
-            else None
-        )
-        tools_manual = generate_tools_manual(tools)
-
         self.prompt = SWEPromptBuilder(
-            self.issue_description, tools_manual=tools_manual
+            self.issue_description, tools_manual=sandbox.tools
         )
         self.llm_request = LlmRequest(model_name, provider_url)
 

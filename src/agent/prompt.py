@@ -24,8 +24,8 @@ class PromptBuilder:
         formatted_tests = repr(self.test_list)
         manual_section = self.tools_manual or (
             "AVAILABLE TOOLS:\n"
-            "1. run_tests(code: str, test_list: list[str]) -> dict:\n"
-            "   Runs candidate code against test assertions.\n"
+            "1. run_tests(code: str, test_list: list[str]) -> str:\n"
+            "   Runs candidate code against test assertions and returns a JSON string ('success': bool, 'output': str).\n"
             "2. final_answer(solution_code: str):\n"
             "   Call this built-in function to submit your final solution."
         )
@@ -40,7 +40,10 @@ class PromptBuilder:
             "3. TWO-PHASE DISCIPLINE (STRICT):\n"
             "   - NEVER call final_answer and run_tests in the same script.\n"
             "   - Phase 1 (Test): Call run_tests, print the result, and STOP. Wait for the sandbox observation.\n"
-            "   - Phase 2 (Submit): In a subsequent step, once you observe that all tests passed, call final_answer.\n\n"
+            "   - Phase 2 (Submit): In a subsequent step, once you observe that all tests passed, call final_answer.\n"
+            "4. TOOL RETURN VALUES:\n"
+            "   - `run_tests` returns a JSON string (NOT a dictionary). Do NOT do `res['success']`!\n"
+            "   - Simply use `print(res)` so the test output is captured in the observation.\n\n"
             "PATTERN 1 - Testing your candidate solution:\n"
             "```python\n"
             "candidate = '''\n"
@@ -48,7 +51,7 @@ class PromptBuilder:
             "    ...\n"
             "'''\n"
             "res = run_tests(candidate, tests)\n"
-            "print(res)\n"
+            "print(res)  # Do NOT do res['success'], run_tests returns a JSON string!\n"
             "```\n\n"
             "PATTERN 2 - Submitting final solution (ONLY in a separate step after tests pass):\n"
             "```python\n"
@@ -88,8 +91,16 @@ class PromptBuilder:
         self.payload["messages"].append(assistant_message)
 
     def add_error_feedback(self, trace: str) -> None:
+        type_error_hint = ""
+        if "string indices must be integers" in trace or "TypeError" in trace:
+            type_error_hint = (
+                "\nCRITICAL NOTE: `run_tests` returns a JSON string, NOT a dict.\n"
+                "Do NOT do `res['success']`! Simply `print(res)` to see test results, "
+                "or use `json.loads(res)`.\n"
+            )
+
         feedback_text = (
-            f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n\n"
+            f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n{type_error_hint}\n"
             "INSTRUCTIONS FOR NEXT STEP:\n"
             "1. If tests failed, analyze the failure, correct"
             " your algorithm, and RE-TEST using:\n"
