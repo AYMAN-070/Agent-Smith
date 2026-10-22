@@ -37,7 +37,7 @@ def format_tool_signature(tool: Mapping[str, Any]) -> str:
 DEFAULT_MBPP_TOOLS: list[dict[str, Any]] = [
     {
         "name": "run_tests",
-        "description": "Runs candidate code against test assertions and returns success status and output.",
+        "description": "Runs candidate code against test assertions and returns a JSON string ('success': bool, 'output': str). Note: returns a JSON string, print() to view.",
         "inputSchema": {
             "type": "object",
             "properties": {

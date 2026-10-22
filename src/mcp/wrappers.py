@@ -1,18 +1,5 @@
-import json
 from typing import Any, Callable, Dict, List
 from src.mcp.client import MCPClient
-
-
-class JsonString(str):
-
-    def __getitem__(self, cle):
-        if isinstance(cle, str):
-            try:
-                vrai_dictionnaire = json.loads(self)
-                return vrai_dictionnaire[cle]
-            except:
-                pass # Si ça rate (ce n'est pas du JSON), on ignore
-        return super().__getitem__(cle)
 
 
 class ToolWrapper:
@@ -45,11 +32,10 @@ class ToolWrapper:
         mapped.update(kwargs)
         return mapped
 
-    def __call__(self, *args: Any, **kwargs: Any) -> JsonString:
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Executed whenever the tool is called as a Python function"""
         arguments = self._prepare_arguments(args, kwargs)
-        raw_result = self.client.call_tool(self.name, arguments)
-        return JsonString(raw_result)
+        return self.client.call_tool(self.name, arguments)
 
 
 def create_tool_wrappers(client: MCPClient) -> Dict[str, Callable[..., Any]]:
