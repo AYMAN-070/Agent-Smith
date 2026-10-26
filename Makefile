@@ -32,7 +32,7 @@ sandbox-swe:
 	uv run sandbox --mcp-stdio "python3 mcp_tools_swebench.py" sandbox_template.json
 
 run-mbpp:
-	uv run python -m agent_mbpp --task-file $(or $(TASK_FILE),task.json) --output $(or $(OUTPUT_FILE),solution.json)
+	uv run python -m agent_mbpp --task-file $(or $(TASK_FILE),taskmbpp.json) --output $(or $(OUTPUT_FILE),solution.json)
 
 run-swe:
 	uv run python -m agent_swebench --task-file $(or $(TASK_FILE),task.json) --output $(or $(OUTPUT_FILE),solution.json)

@@ -1,7 +1,9 @@
 import argparse
 from pathlib import Path
 import shlex
-
+from typing import Any
+import sys
+import signal
 from src.agent.loop import MBPPAgentLoop
 from src.models import MBPPTaskInput
 from src.sandbox.executor import SandboxExecutor
@@ -54,6 +56,14 @@ def main() -> None:
     task = MBPPTaskInput.model_validate_json(task_content)
 
     sandbox = SandboxExecutor()
+
+    def clean_exit(signum: int, frame: Any) -> None:
+        print("\nKill signal received, cleaning in progress...")
+        sandbox.close()
+        sys.exit(143)
+
+    signal.signal(signal.SIGTERM, clean_exit)
+    signal.signal(signal.SIGINT, clean_exit)
 
     if args.mcp_server:
         sandbox.connect_mcp(server_url=args.mcp_server)
