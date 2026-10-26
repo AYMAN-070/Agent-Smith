@@ -4,6 +4,7 @@ from pathlib import Path
 import signal
 import sys
 import shlex
+from typing import Any
 
 from src.agent.loop import SWEAgentLoop
 from src.docker_handler import DockerContainer
@@ -62,8 +63,8 @@ def main() -> None:
     docker_container = DockerContainer(task.docker_image)
     sandbox = SandboxExecutor()
 
-    def clean_exit(signum, frame):
-        print("\n Kill signal receive, cleaning in process")
+    def clean_exit(signum: int, frame: Any) -> None:
+        print("\nKill signal received, cleaning in progress...")
         docker_container.stop_and_remove()
         sandbox.close()
         sys.exit(143)
