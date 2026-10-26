@@ -1,17 +1,16 @@
 import builtins
 import io
 import multiprocessing
-from multiprocessing.queues import Queue
 import resource
 import sys
 import traceback
-import types
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Dict, Optional
+from multiprocessing.queues import Queue
+from pathlib import Path
+from typing import Any, Optional, cast
 
 from src.models import SandboxConfig
 
-#  SECURITY & GUARDS (Safe Builtins, Imports, and Final Answer)
 
 SAFE_BUILTINS: dict[str, Any] = {
     "print": print,
@@ -61,7 +60,7 @@ SAFE_BUILTINS: dict[str, Any] = {
 
 
 class FinalAnswerException(Exception):
-    """Exception raised when the agent calls final_answer()."""
+    """Signal that the executed code has returned its final answer."""
 
     def __init__(self, answer: Any) -> None:
         super().__init__()
@@ -69,22 +68,15 @@ class FinalAnswerException(Exception):
 
 
 def agent_final_answer(answer: Any) -> None:
-    """Builtin function injected into sandbox to capture final answer."""
+    """Stop execution and pass the final answer to the worker."""
     raise FinalAnswerException(answer)
-
-
-ModuleMapping = Mapping[str, types.ModuleType | Mapping[str, Any]]
 
 
 def create_safe_import(
     authorized_imports: Sequence[str],
-    custom_modules: ModuleMapping | None = None,
 ) -> Callable[..., Any]:
-    """Create a guarded __import__ function that respects allowed imports."""
+    """Return an import function that allows only configured modules."""
     real_import = builtins.__import__
-    resolved_custom_modules: ModuleMapping = (
-        custom_modules if custom_modules is not None else {}
-    )
 
     def safe_import(
         name: str,
@@ -93,29 +85,12 @@ def create_safe_import(
         fromlist: Sequence[str] = (),
         level: int = 0,
     ) -> Any:
-        #  Check if a custom or mocked module is provided
-        if name in resolved_custom_modules:
-            mod = resolved_custom_modules[name]
-            if isinstance(mod, Mapping):
-                fake_module = types.ModuleType(name)
-                for attr, val in mod.items():
-                    setattr(fake_module, attr, val)
-                return fake_module
-            return mod
-
-        #  Check for allowed module imports
-        is_allowed = False
-        if name in authorized_imports:
-            is_allowed = True
-        else:
-            for allowed in authorized_imports:
-                if allowed.endswith(".*"):
-                    base_module = allowed[:-2]
-                    if name.startswith(base_module + "."):
-                        is_allowed = True
-                        break
-
-        if not is_allowed:
+        allowed = any(
+            name == module
+            or (module.endswith(".*") and name.startswith(module[:-2] + "."))
+            for module in authorized_imports
+        )
+        if not allowed:
             raise ImportError(
                 f"Sandbox security: importing module '{name}' is forbidden."
             )
@@ -125,188 +100,213 @@ def create_safe_import(
     return safe_import
 
 
+def create_safe_open(
+    allowed_directories: Sequence[str],
+) -> Callable[..., Any]:
+    """Return an open function restricted to configured directories."""
+    real_open = builtins.open
+
+    def safe_open(file: Any, *args: Any, **kwargs: Any) -> Any:
+        if not isinstance(file, (str, Path)):
+            raise PermissionError(
+                "Sandbox security: only string and Path filenames are allowed."
+            )
+
+        target = Path(file).resolve()
+        for directory in allowed_directories:
+            allowed_path = Path(directory).resolve()
+            try:
+                target.relative_to(allowed_path)
+            except ValueError:
+                continue
+            return real_open(target, *args, **kwargs)
+
+        raise PermissionError(
+            f"Sandbox security: access to '{target}' is denied. "
+            f"Allowed directories: {list(allowed_directories)}"
+        )
+
+    return safe_open
+
+
 def create_safe_environment(
     config: SandboxConfig,
-    custom_modules: Any | None = None,
+    tools: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    """Create a restricted execution environment
-    with safe builtins and imports."""
-    builtins_dict = dict(SAFE_BUILTINS)
-    builtins_dict["__import__"] = create_safe_import(
-        config.authorized_imports, custom_modules=custom_modules
-    )
+    """Build the globals dictionary used to execute code in the sandbox."""
+    safe_builtins = SAFE_BUILTINS.copy()
+    safe_builtins["__import__"] = create_safe_import(config.authorized_imports)
+    safe_builtins["open"] = create_safe_open(config.allowed_directories)
 
-    env: dict[str, Any] = {
-        "__builtins__": builtins_dict,
+    environment: dict[str, Any] = {
+        "__builtins__": safe_builtins,
         "final_answer": agent_final_answer,
     }
 
-    if custom_modules:
-        for k, v in custom_modules.items():
-            if callable(v):
-                env[k] = v
-            elif isinstance(v, dict):
-                for sub_k, sub_v in v.items():
-                    if callable(sub_v):
-                        env[sub_k] = sub_v
+    # Make callable tools (including MCP wrappers) available by name.
+    for name, tool in (tools or {}).items():
+        if callable(tool):
+            environment[name] = tool
 
-    return env
+    return environment
 
 
-#  ISOLATED WORKER & RESOURCE LIMITS
+def apply_network_block() -> None:
+    """Disable all inbound and outbound network access in the worker process."""
+
+    class BlockedSocket:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            raise PermissionError("Sandbox security: network access is forbidden.")
+
+    def blocked_func(*args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("Sandbox security: network access is forbidden.")
+
+    import socket
+
+    for attr in (
+        "create_connection",
+        "getaddrinfo",
+        "gethostbyname",
+        "gethostbyname_ex",
+        "getnameinfo",
+        "socketpair",
+        "fromfd",
+    ):
+        setattr(socket, attr, blocked_func)
+    setattr(socket, "socket", BlockedSocket)
+
+    try:
+        import _socket
+
+        for attr in (
+            "getaddrinfo",
+            "gethostbyname",
+            "gethostbyname_ex",
+            "getnameinfo",
+        ):
+            setattr(_socket, attr, blocked_func)
+        setattr(_socket, "socket", BlockedSocket)
+    except (ImportError, AttributeError):
+        pass
 
 
 def apply_system_limits(config: SandboxConfig) -> None:
-    """Apply memory limit to the current process via resource.setrlimit."""
-    byte_limit = config.max_memory_mb * 1024 * 1024
-    resource.setrlimit(resource.RLIMIT_AS, (byte_limit, byte_limit))
+    """Limit the worker process's virtual memory and block network access."""
+    memory_bytes = config.max_memory_mb * 1024 * 1024
+    resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
+    apply_network_block()
 
 
 def isolated_worker(
     code: str,
     config: SandboxConfig,
-    queue: Queue,
-    custom_modules: dict[str, Any] | None = None,
-    env: dict[str, Any] | None = None,
+    queue: Queue[Any],
+    tools: Optional[dict[str, Any]] = None,
+    env: Optional[dict[str, Any]] = None,
 ) -> None:
-    """Executes code in an isolated process,
-    enforces limits, and returns results."""
-    captured_output = io.StringIO()
+    """Execute code in a separate process and send its result through the queue."""
+    output = io.StringIO()
+    original_stdout = sys.stdout
+
     try:
         apply_system_limits(config)
-        safe_env = create_safe_environment(
-            config,
-            custom_modules=custom_modules,
-        )
-        if env:
-            safe_env.update(env)
+        safe_env = create_safe_environment(config, tools)
+        safe_env.update(env or {})
 
-        sys.stdout = captured_output
+        sys.stdout = output
         exec(code, safe_env)
-        sys.stdout = sys.__stdout__
 
-        import pickle
+        result = {
+            "status": "success",
+            "output": output.getvalue(),
+        }
 
-        updated_env: dict[str, Any] = {}
-        for k, v in safe_env.items():
-            if k.startswith("__") or k == "final_answer":
-                continue
-            if custom_modules and (k in custom_modules or k == "agent_tools"):
-                continue
-            try:
-                pickle.dumps(v)
-                updated_env[k] = v
-            except Exception:
-                pass
+    except FinalAnswerException as error:
+        result = {
+            "status": "final_answer",
+            "answer": error.answer,
+            "output": output.getvalue(),
+        }
+    except Exception as error:
+        result = {
+            "status": "error",
+            "error": traceback.format_exc(),
+            "error_type": type(error).__name__,
+            "output": output.getvalue(),
+        }
+    finally:
+        sys.stdout = original_stdout
 
-        queue.put(
-            {
-                "status": "success",
-                "output": captured_output.getvalue(),
-                "env": updated_env,
-            }
-        )
-
-    except FinalAnswerException as fa_exc:
-        sys.stdout = sys.__stdout__
-        queue.put(
-            {
-                "status": "final_answer",
-                "answer": fa_exc.answer,
-                "output": captured_output.getvalue(),
-            }
-        )
-    except Exception as e:
-        sys.stdout = sys.__stdout__
-        tb_str = traceback.format_exc()
-        queue.put(
-            {
-                "status": "error",
-                "error": tb_str,
-                "error_type": type(e).__name__,
-                "output": captured_output.getvalue(),
-            }
-        )
-
-
-# SANDBOX EXECUTOR (Supervisor with Process & Timeout)
+    queue.put(result)
 
 
 class SandboxExecutor:
-    """Manages code execution inside an isolated
-    worker process with strict timeout."""
+    """Run Python code in a separate process with resource limits and timeout."""
 
     def __init__(self, config: Optional[SandboxConfig] = None) -> None:
-        self.config: SandboxConfig = (
-            config if config is not None else SandboxConfig()
-        )
-        self.custom_modules: Dict[str, Any] = {}
+        self.config = config if config is not None else SandboxConfig()
+        self.tool_wrappers: dict[str, Any] = {}
         self.mcp_client: Any = None
-        self.tools: str = self.get_tools_manual()
+        self.tools = self.get_tools_manual()
 
     def connect_mcp(
         self,
         stdio_cmd: Optional[str] = None,
         server_url: Optional[str] = None,
     ) -> None:
-        """Connects to an MCP server (stdio or HTTP) and registers tools in sandbox."""
+        """Connect to an MCP server and register its tools as local wrappers."""
         if server_url:
             from src.mcp.client import HttpMCPClient
-
             self.mcp_client = HttpMCPClient(server_url)
-            self.mcp_client.start()
+
         elif stdio_cmd:
             from src.mcp.client import MCPClient
-
             self.mcp_client = MCPClient(stdio_cmd)
+
+        if self.mcp_client:
             self.mcp_client.start()
 
-        if self.mcp_client and getattr(self.mcp_client, "tools", None):
+        if getattr(self.mcp_client, "tools", None):
             from src.mcp.wrappers import create_tool_wrappers
 
-            tool_wrappers = create_tool_wrappers(self.mcp_client)
-            self.register_custom_module("agent_tools", tool_wrappers)
-            self.custom_modules.update(tool_wrappers)
+            self.tool_wrappers = create_tool_wrappers(self.mcp_client)
             self.tools = self.get_tools_manual()
 
     def get_tools_manual(self) -> str:
-        """Returns the documentation manual for all tools available in the sandbox."""
+        """Return documentation for the tools available in the sandbox."""
         from src.sandbox.manual import generate_tools_manual
 
-        tools = (
-            self.mcp_client.tools
-            if self.mcp_client and getattr(self.mcp_client, "tools", None)
-            else None
-        )
-        return generate_tools_manual(tools)
+        mcp_tools = getattr(self.mcp_client, "tools", None)
+        return generate_tools_manual(mcp_tools)
 
     def close(self) -> None:
-        """Terminates connected MCP server client cleanly if running."""
+        """Stop the MCP client if one is connected."""
         if self.mcp_client:
             self.mcp_client.stop()
             self.mcp_client = None
 
     def register_custom_module(self, name: str, module_or_tools: Any) -> None:
-        """Register custom module or mock tools for the sandbox."""
-        self.custom_modules[name] = module_or_tools
+        """Register one tool or a dictionary of tools."""
+        if isinstance(module_or_tools, dict):
+            self.tool_wrappers.update(module_or_tools)
+        else:
+            self.tool_wrappers[name] = module_or_tools
 
     def execute(
         self,
         code: str,
-        custom_modules: Optional[Dict[str, Any]] = None,
-        env: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Runs the worker process with strict timeout and isolation."""
-        merged_modules: Dict[str, Any] = {**self.custom_modules}
-        if custom_modules:
-            merged_modules.update(custom_modules)
+        custom_modules: Optional[dict[str, Any]] = None,
+        env: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """Execute code in a worker process and return its result."""
+        # MCP wrappers and caller-provided tools are available in the worker.
+        tools = {**self.tool_wrappers, **(custom_modules or {})}
+        result_queue: Queue[Any] = multiprocessing.Queue()
 
-        queue = multiprocessing.Queue()
         process = multiprocessing.Process(
             target=isolated_worker,
-            args=(code, self.config, queue, merged_modules, env),
+            args=(code, self.config, result_queue, tools, env),
         )
-
         process.start()
         process.join(timeout=self.config.max_execution_time_seconds)
 
@@ -318,8 +318,8 @@ class SandboxExecutor:
                 "error": "Sandbox Security: Execution timeout exceeded.",
             }
 
-        if not queue.empty():
-            return queue.get()
+        if not result_queue.empty():
+            return cast(dict[str, Any], result_queue.get())
 
         return {
             "status": "error",

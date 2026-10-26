@@ -16,7 +16,9 @@ class ToolWrapper:
         properties = tool_schema.get("inputSchema", {}).get("properties", {})
         self.param_names: List[str] = list(properties.keys())
 
-    def _prepare_arguments(self, args: tuple, kwargs: dict) -> Dict[str, Any]:
+    def _prepare_arguments(
+        self, args: tuple[Any, ...], kwargs: dict[str, Any]
+    ) -> Dict[str, Any]:
         """Maps positional arguments (*args) and keyword arguments (**kwargs)
         to the parameter names expected by the MCP tool.
         """
