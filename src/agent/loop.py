@@ -47,7 +47,21 @@ class MBPPAgentLoop:
             )
             code_for_sandbox = llm_response.code
             print("\n📥 [LLM Generated Code]:")
-            print(code_for_sandbox)
+            print(code_for_sandbox if code_for_sandbox else "(No Python code detected)")
+            if not code_for_sandbox:
+                print("⚠️  [Warning]: No code block detected. Prompting LLM to format correctly.")
+                feedback = (
+                    "Error: No executable Python code block was detected in your response.\n"
+                    "You MUST wrap your Python code in ```python\n<code here>\n```.\n"
+                    "If you have completed the solution, call final_answer(solution_code)."
+                )
+                self.prompt.add_model_response(llm_response.llm_output)
+                self.prompt.add_error_feedback(feedback)
+
+                sand_answer = {"status": "error", "error": "No Python code found", "output": ""}
+                steps_metric.append(self.record_step(llm_response, sand_answer, step))
+                current_loop += 1
+                continue
 
             print("⚙️  [2/3] Executing in Sandbox...")
             sand_answer = self.sandbox.execute(code_for_sandbox)
@@ -242,7 +256,21 @@ class SWEAgentLoop:
             llm_response = self.llm_request.generate_code(self.prompt)
             code_for_sandbox = llm_response.code
             print("\n📥 [LLM Generated Code]:")
-            print(code_for_sandbox)
+            print(code_for_sandbox if code_for_sandbox else "(No Python code detected)")
+            if not code_for_sandbox:
+                print("⚠️  [Warning]: No code block detected. Prompting LLM to format correctly.")
+                feedback = (
+                    "Error: No executable Python code block was detected in your response.\n"
+                    "You MUST wrap your Python code in ```python\n<code here>\n```.\n"
+                    "If you have completed the solution, call final_answer(solution_code)."
+                )
+                self.prompt.add_model_response(llm_response.llm_output)
+                self.prompt.add_feedback(feedback)
+
+                sand_answer = {"status": "error", "error": "No Python code found", "output": ""}
+                steps_metric.append(self.record_step(llm_response, sand_answer, step))
+                current_loop += 1
+                continue
 
             print("⚙️  [2/3] Executing in Sandbox...")
             sand_answer = self.sandbox.execute(code_for_sandbox)

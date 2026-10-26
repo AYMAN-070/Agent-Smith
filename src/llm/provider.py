@@ -23,9 +23,14 @@ class Provider:
         grok_keys = [
             val for key, val in os.environ.items() if key.startswith("GROK")
         ]
+        nvidia_keys = [
+            val
+            for key, val in os.environ.items()
+            if key.startswith("NVIDIA_API")
+        ]
 
         if model and provider:
-            keys = gemini_keys or openai_keys or grok_keys
+            keys = gemini_keys or openai_keys or grok_keys or nvidia_keys
             self.provider = [
                 {
                     "name": "Custom",
@@ -36,6 +41,14 @@ class Provider:
             ]
         else:
             self.provider = [
+                {
+                    "name": "NVIDIA",
+                    "base_url": "https://integrate.api.nvidia.com/v1",
+                    "api_keys": nvidia_keys,
+                    "models": [
+                        "nvidia/nemotron-3-ultra-550b-a55b",
+                    ],
+                },
                 {
                     "name": "Gemini",
                     "base_url": (
