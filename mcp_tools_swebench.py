@@ -23,14 +23,14 @@ def _docker_exec(
     workdir: str = "/testbed",
     input_text: str | None = None,
     timeout: int = 120,
-) -> subprocess.CompletedProcess:
+) -> subprocess.CompletedProcess[str]:
     """Execute a command inside the active Docker container."""
     full_cmd = ["docker", "exec"]
     if input_text is not None:
         full_cmd.append("-i")
     if workdir:
         full_cmd.extend(["-w", workdir])
-    full_cmd.append(CONTAINER_ID)
+    full_cmd.append(CONTAINER_ID or "")
     full_cmd.extend(cmd)
     return subprocess.run(
         full_cmd,
@@ -38,6 +38,36 @@ def _docker_exec(
         capture_output=True,
         text=True,
         timeout=timeout,
+    )
+
+
+@mcp.resource("swebench://guidelines")
+def get_swebench_guidelines() -> str:
+    """Return instructions and guidelines for solving SWE-bench tasks."""
+    return (
+        "# SWE-bench Guidelines\n\n"
+        "### 1. Goal\n"
+        "Solve real-world GitHub issues by creating a clean git patch.\n\n"
+        "### 2. Workflow\n"
+        "1. Search codebase using `search_code` and `list_files`.\n"
+        "2. Read relevant files with `read_file`.\n"
+        "3. Reproduce the bug using `run_tests` or `run_command`.\n"
+        "4. Fix the bug with `edit_file` or `write_file`.\n"
+        "5. Verify fix and check for regressions.\n"
+        "6. Call `final_answer(get_patch())` to finish.\n"
+    )
+
+
+@mcp.prompt()
+def debug_swebench_issue(issue_description: str) -> str:
+    """Template prompt to guide reproducing and fixing a SWE-bench issue."""
+    return (
+        f"You are tasked with fixing the following issue:\n\n{issue_description}\n\n"
+        "Follow these steps:\n"
+        "1. Locate relevant code files.\n"
+        "2. Reproduce the issue with tests.\n"
+        "3. Edit files to fix the bug.\n"
+        "4. Verify the fix and submit using final_answer(get_patch())."
     )
 
 

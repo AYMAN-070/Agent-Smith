@@ -63,7 +63,7 @@ class Provider:
                 },
             ]
 
-    def send_request(self, payload: dict) -> tuple[Any, int]:
+    def send_request(self, payload: dict[str, Any]) -> tuple[Any, int]:
         retries = 0
         last_error = None
         for provider in self.provider:

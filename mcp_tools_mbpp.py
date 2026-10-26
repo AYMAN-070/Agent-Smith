@@ -1,12 +1,79 @@
 #!/usr/bin/env python3
 """
 MCP Server for MBPP benchmark tools.
-Exposes tools over standard input/output (stdio) according to the Model Context Protocol (JSON-RPC 2.0).
+Exposes tools, resources, and prompts over standard input/output (stdio)
+according to the Model Context Protocol (JSON-RPC 2.0).
 """
 
-import sys
 import json
+import sys
 from typing import Any, Dict, List
+
+MBPP_GUIDELINES_TEXT = """# MBPP (Mostly Basic Python Problems) Guidelines
+
+### 1. Goal
+Solve algorithmic challenges by implementing clean, correct, and self-contained Python 3.10 functions.
+
+### 2. Implementation Rules
+- Function Signature: Must strictly match the task prompt and assertions.
+- Allowed Dependencies: Only Python standard library modules (e.g., math, collections, itertools, re).
+- Purity: Functions must be self-contained without unintended side effects.
+
+### 3. Testing Workflow
+- Validate using the run_tests(code, test_list) tool.
+- Ensure all test assertions pass before submitting.
+
+### 4. Submission
+- Call final_answer(solution_code) with your solution Python code string.
+"""
+
+RESOURCES_SCHEMA = [
+    {
+        "uri": "mbpp://guidelines",
+        "name": "MBPP Benchmark Guidelines",
+        "description": "Rules, constraints, and best practices for solving MBPP tasks",
+        "mimeType": "text/markdown",
+    }
+]
+
+PROMPTS_SCHEMA = [
+    {
+        "name": "solve_mbpp_task",
+        "description": "Template prompt to guide solving an MBPP algorithmic task",
+        "arguments": [
+            {
+                "name": "task_prompt",
+                "description": "The description of the function to implement",
+                "required": True,
+            }
+        ],
+    }
+]
+
+TOOLS_SCHEMA = [
+    {
+        "name": "run_tests",
+        "description": (
+            "Run candidate Python code against a list of test assertions "
+            "and return a JSON summary ('success': bool, 'output': str)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Candidate Python function code",
+                },
+                "test_list": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of assert statements (e.g. ['assert add(1, 2) == 3'])",
+                },
+            },
+            "required": ["code", "test_list"],
+        },
+    }
+]
 
 
 def run_tests(code: str, test_list: List[str]) -> str:
@@ -17,7 +84,7 @@ def run_tests(code: str, test_list: List[str]) -> str:
     except Exception as e:
         return json.dumps({
             "success": False,
-            "output": f"Code execution failed ({type(e).__name__}): {e}"
+            "output": f"Code execution failed ({type(e).__name__}): {e}",
         })
 
     passed = 0
@@ -36,36 +103,13 @@ def run_tests(code: str, test_list: List[str]) -> str:
     if passed == total:
         return json.dumps({
             "success": True,
-            "output": f"All {total} tests passed successfully."
+            "output": f"All {total} tests passed successfully.",
         })
     else:
         return json.dumps({
             "success": False,
-            "output": f"{passed}/{total} tests passed. Failures:\n" + "\n".join(failed_details)
+            "output": f"{passed}/{total} tests passed. Failures:\n" + "\n".join(failed_details),
         })
-
-
-TOOLS_SCHEMA = [
-    {
-        "name": "run_tests",
-        "description": "Run candidate Python code against a list of test assertions and return a JSON summary ('success': bool, 'output': str).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string",
-                    "description": "Candidate Python function code"
-                },
-                "test_list": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of assert statements (e.g. ['assert add(1, 2) == 3'])"
-                }
-            },
-            "required": ["code", "test_list"]
-        }
-    }
-]
 
 
 def send_response(response: Dict[str, Any]) -> None:
@@ -93,13 +137,15 @@ def handle_request(line: str) -> None:
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {
-                    "tools": {}
+                    "tools": {},
+                    "resources": {},
+                    "prompts": {},
                 },
                 "serverInfo": {
                     "name": "mcp_tools_mbpp",
-                    "version": "1.0.0"
-                }
-            }
+                    "version": "1.0.0",
+                },
+            },
         })
         return
 
@@ -113,8 +159,8 @@ def handle_request(line: str) -> None:
             "jsonrpc": "2.0",
             "id": req_id,
             "result": {
-                "tools": TOOLS_SCHEMA
-            }
+                "tools": TOOLS_SCHEMA,
+            },
         })
         return
 
@@ -128,7 +174,6 @@ def handle_request(line: str) -> None:
             test_list = arguments.get("test_list", [])
             output = run_tests(code, test_list)
 
-            # MCP spec requires content array in tool call result
             send_response({
                 "jsonrpc": "2.0",
                 "id": req_id,
@@ -136,10 +181,10 @@ def handle_request(line: str) -> None:
                     "content": [
                         {
                             "type": "text",
-                            "text": output
+                            "text": output,
                         }
-                    ]
-                }
+                    ],
+                },
             })
             return
         else:
@@ -148,8 +193,98 @@ def handle_request(line: str) -> None:
                 "id": req_id,
                 "error": {
                     "code": -32601,
-                    "message": f"Method/Tool '{tool_name}' not found."
-                }
+                    "message": f"Method/Tool '{tool_name}' not found.",
+                },
+            })
+            return
+
+    # List available resources
+    if method == "resources/list":
+        send_response({
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "result": {
+                "resources": RESOURCES_SCHEMA,
+            },
+        })
+        return
+
+    # Read a resource
+    if method == "resources/read":
+        uri = params.get("uri")
+        if uri == "mbpp://guidelines":
+            send_response({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "contents": [
+                        {
+                            "uri": uri,
+                            "mimeType": "text/markdown",
+                            "text": MBPP_GUIDELINES_TEXT,
+                        }
+                    ],
+                },
+            })
+            return
+        else:
+            send_response({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {
+                    "code": -32602,
+                    "message": f"Resource '{uri}' not found.",
+                },
+            })
+            return
+
+    # List available prompts
+    if method == "prompts/list":
+        send_response({
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "result": {
+                "prompts": PROMPTS_SCHEMA,
+            },
+        })
+        return
+
+    # Get a prompt
+    if method == "prompts/get":
+        prompt_name = params.get("name")
+        prompt_args = params.get("arguments", {})
+        if prompt_name == "solve_mbpp_task":
+            task_desc = prompt_args.get("task_prompt", "")
+            send_response({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "description": "Template prompt to guide solving an MBPP algorithmic task",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": {
+                                "type": "text",
+                                "text": (
+                                    f"Please write a Python function that solves the following problem:\n"
+                                    f"{task_desc}\n\n"
+                                    "Make sure your function passes all test assertions and call "
+                                    "final_answer(code) when done."
+                                ),
+                            },
+                        }
+                    ],
+                },
+            })
+            return
+        else:
+            send_response({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {
+                    "code": -32602,
+                    "message": f"Prompt '{prompt_name}' not found.",
+                },
             })
             return
 
@@ -160,8 +295,8 @@ def handle_request(line: str) -> None:
             "id": req_id,
             "error": {
                 "code": -32601,
-                "message": f"Method '{method}' not found."
-            }
+                "message": f"Method '{method}' not found.",
+            },
         })
 
 

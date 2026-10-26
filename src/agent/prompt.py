@@ -1,6 +1,5 @@
 from src.models import MBPPTaskInput
 from typing import Any, Optional
-from src.sandbox.manual import generate_tools_manual
 
 
 class PromptBuilder:
@@ -87,7 +86,10 @@ class PromptBuilder:
         }
 
     def add_model_response(self, llm_text: str) -> None:
-        assistant_message: dict = {"role": "assistant", "content": llm_text}
+        assistant_message: dict[str, Any] = {
+            "role": "assistant",
+            "content": llm_text,
+        }
         self.payload["messages"].append(assistant_message)
 
     def add_error_feedback(self, trace: str) -> None:
@@ -122,7 +124,7 @@ class PromptBuilder:
             "IMPORTANT: Do not just define the function. You MUST"
             " either print(run_tests(...)) or call final_answer(...)."
         )
-        feedback: dict = {"role": "user", "content": feedback_text}
+        feedback: dict[str, Any] = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)
 
 
@@ -174,7 +176,7 @@ class SWEPromptBuilder:
             "Start by exploring the repository to find where the bug is located. Write your first Python script to search or read files."
         )
 
-        self.payload = {
+        self.payload: dict[str, Any] = {
             "messages": [
                 {"role": "system", "content": self.system_instruction},
                 {"role": "user", "content": user_content},
@@ -185,7 +187,10 @@ class SWEPromptBuilder:
         }
 
     def add_model_response(self, llm_text: str) -> None:
-        assistant_message: dict = {"role": "assistant", "content": llm_text}
+        assistant_message: dict[str, Any] = {
+            "role": "assistant",
+            "content": llm_text,
+        }
         self.payload["messages"].append(assistant_message)
 
     def add_feedback(self, trace: str) -> None:
@@ -197,5 +202,5 @@ class SWEPromptBuilder:
             "If tests pass and the fix is verified, retrieve and submit your patch with `final_answer(get_patch())`.\n"
             "Remember: Output ONLY valid python code enclosed in ```python ... ```."
         )
-        feedback: dict = {"role": "user", "content": feedback_text}
+        feedback: dict[str, Any] = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)

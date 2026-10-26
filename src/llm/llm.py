@@ -1,5 +1,6 @@
 import re
 import time
+from typing import Any
 
 from src.agent.prompt import PromptBuilder, SWEPromptBuilder
 from src.llm.provider import Provider
@@ -7,7 +8,7 @@ from src.llm.provider import Provider
 
 class LlmResponse:
     def __init__(
-        self, data: dict, request_time_ms: float, retries: int
+        self, data: dict[str, Any], request_time_ms: float, retries: int
     ) -> None:
 
         self.raw_data = data
@@ -39,7 +40,9 @@ class LlmRequest:
     ) -> None:
         self.provider = Provider(model, provider)
 
-    def generate_code(self, prompt: SWEPromptBuilder) -> LlmResponse:
+    def generate_code(
+        self, prompt: PromptBuilder | SWEPromptBuilder
+    ) -> LlmResponse:
 
         start_time = time.time()
         data, retries = self.provider.send_request(prompt.payload)
