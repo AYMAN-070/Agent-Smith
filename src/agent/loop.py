@@ -1,5 +1,5 @@
-from pathlib import Path
 import time
+from pathlib import Path
 from typing import Any
 
 from src.agent.prompt import PromptBuilder, SWEPromptBuilder
@@ -270,9 +270,8 @@ class SWEAgentLoop:
                     m in str(solution) for m in patch_markers
                 ):
                     patch_res = self.sandbox.execute("print(get_patch())")
-                    if (
-                        patch_res.get("status") == "success"
-                        and patch_res.get("output")
+                    if patch_res.get("status") == "success" and patch_res.get(
+                        "output"
                     ):
                         candidate_patch = patch_res["output"].strip()
                         if any(m in candidate_patch for m in patch_markers):
