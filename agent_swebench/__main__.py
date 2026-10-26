@@ -12,12 +12,12 @@ from src.sandbox.executor import SandboxExecutor
 
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Agent Smith MBPP CLI")
+    parser = argparse.ArgumentParser(description="Agent Smith SWE-bench CLI")
     parser.add_argument(
         "--task-file",
         type=str,
         required=True,
-        help="Path to MBPP task.json",
+        help="Path to SWE-bench task.json",
     )
     parser.add_argument(
         "--output",
@@ -55,7 +55,7 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
     task_content = Path(args.task_file).read_text(encoding="utf-8")
-    # new class Agentargs non exploiter pour linstant
+    # Optional AgentArgs instance (currently unused)
     # parser = AgentArgs("Agent SWE")
     # task_content = Path(parser.task_file).read_text(encoding="utf-8")
     task = SWEBenchTaskInput.model_validate_json(task_content)

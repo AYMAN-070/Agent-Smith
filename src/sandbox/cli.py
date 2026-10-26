@@ -122,9 +122,7 @@ def main() -> None:
             stdio_cmd=args.mcp_stdio, server_url=args.mcp_server
         )
         if executor.mcp_client:
-            tools_list = list(
-                executor.custom_modules.get("agent_tools", {}).keys()
-            )
+            tools_list = list(executor.tool_wrappers.keys())
             transport_info = (
                 f"HTTP ({args.mcp_server})"
                 if args.mcp_server

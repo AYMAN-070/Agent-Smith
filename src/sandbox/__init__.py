@@ -8,6 +8,7 @@ from src.sandbox.executor import (
     apply_system_limits,
     create_safe_environment,
     create_safe_import,
+    create_safe_open,
     isolated_worker,
 )
 from src.sandbox.manual import generate_tools_manual
@@ -21,6 +22,7 @@ __all__ = [
     "apply_system_limits",
     "create_safe_environment",
     "create_safe_import",
+    "create_safe_open",
     "isolated_worker",
     "generate_tools_manual",
     "sandbox_cli",

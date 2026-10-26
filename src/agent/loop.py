@@ -69,14 +69,14 @@ class MBPPAgentLoop:
                 print(f"Final Solution:\n{solution}")
                 print("=" * 50 + "\n")
 
-                solu = self.build_solution_output(
+                solution_output = self.build_solution_output(
                     status=True,
                     solution=str(solution),
                     steps=steps_metric,
                     total_time_seconds=time.time() - start_time,
                 )
                 Path(self.output_path).write_text(
-                    solu.model_dump_json(indent=2), encoding="utf-8"
+                    solution_output.model_dump_json(indent=2), encoding="utf-8"
                 )
                 return str(solution)
 
@@ -91,8 +91,8 @@ class MBPPAgentLoop:
                         "Warning: You defined a function but did NOT print "
                         "any test results and did NOT call final_answer().\n"
                         "To proceed, you MUST either test your function:\n"
-                        "  from agent_tools import run_tests, TESTS\n"
-                        "  print(run_tests(candidate, TESTS))\n"
+                        "  res = run_tests(candidate, tests)\n"
+                        "  print(res)\n"
                         "Or call final_answer(solution_code)"
                         " if you are sure it works."
                     )
@@ -137,7 +137,7 @@ class MBPPAgentLoop:
         print("\n" + "=" * 50)
         print("⚠️ FAILURE: Max iterations reached without solving the task.")
         print("=" * 50 + "\n")
-        solu = self.build_solution_output(
+        solution_output = self.build_solution_output(
             status=False,
             solution="didnt succeed",
             steps=steps_metric,
@@ -145,7 +145,7 @@ class MBPPAgentLoop:
             error="Max iterations reached without solving the task.",
         )
         Path(self.output_path).write_text(
-            solu.model_dump_json(indent=2), encoding="utf-8"
+            solution_output.model_dump_json(indent=2), encoding="utf-8"
         )
         return "didnt succeed"
 
@@ -277,14 +277,14 @@ class SWEAgentLoop:
                         if any(m in candidate_patch for m in patch_markers):
                             solution = candidate_patch
 
-                solu = self.build_solution_output(
+                solution_output = self.build_solution_output(
                     status=True,
                     solution=str(solution),
                     steps=steps_metric,
                     total_time_seconds=time.time() - start_time,
                 )
                 Path(self.output_path).write_text(
-                    solu.model_dump_json(indent=2), encoding="utf-8"
+                    solution_output.model_dump_json(indent=2), encoding="utf-8"
                 )
                 return str(solution)
 
@@ -335,7 +335,7 @@ class SWEAgentLoop:
         print("\n" + "=" * 50)
         print("⚠️ FAILURE: Max iterations reached without solving the task.")
         print("=" * 50 + "\n")
-        solu = self.build_solution_output(
+        solution_output = self.build_solution_output(
             status=False,
             solution="",
             steps=steps_metric,
@@ -343,7 +343,7 @@ class SWEAgentLoop:
             error="Max iterations reached without solving the task.",
         )
         Path(self.output_path).write_text(
-            solu.model_dump_json(indent=2), encoding="utf-8"
+            solution_output.model_dump_json(indent=2), encoding="utf-8"
         )
         return "FAILED"
 
