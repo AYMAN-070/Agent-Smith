@@ -1,5 +1,6 @@
 import os
 from typing import Any
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -19,21 +20,18 @@ class Provider:
         openai_keys = [
             val for key, val in os.environ.items() if key.startswith("OPEN")
         ]
-        groq_keys = [
-            val for key, val in os.environ.items() if key.startswith("GROQ")
+        grok_keys = [
+            val for key, val in os.environ.items() if key.startswith("GROK")
         ]
 
         if model and provider:
-            keys = gemini_keys or openai_keys or groq_keys
+            keys = gemini_keys or openai_keys or grok_keys
             self.provider = [
                 {
                     "name": "Custom",
                     "base_url": provider,
                     "api_keys": keys,
-                    "models": [
-                        "gemini-3.5-flash-lite",
-                        "gemini-3.1-flash-lite",
-                    ],
+                    "models": [model],
                 }
             ]
         else:
@@ -53,18 +51,22 @@ class Provider:
                     "name": "OpenRouter",
                     "base_url": "https://openrouter.ai/api/v1",
                     "api_keys": openai_keys,
-                    "models": ["meta-llama/llama-3.3-70b-instruct"],
+                    "models": [
+                        "meta-llama/llama-3.3-70b-instruct",
+                        "openai/gpt-4o",
+                    ],
                 },
                 {
                     "name": "Groq",
                     "base_url": "https://api.groq.com/openai/v1",
-                    "api_keys": groq_keys,
+                    "api_keys": grok_keys,
                     "models": ["llama-3.3-70b-versatile"],
                 },
             ]
 
     def send_request(self, payload: dict[str, Any]) -> tuple[Any, int]:
         retries = 0
+        max_retries = 3
         last_error = None
         for provider in self.provider:
             api_keys = [k for k in provider["api_keys"]]
@@ -84,30 +86,50 @@ class Provider:
                             "Content-Type": "application/json",
                         }
                         payload["model"] = model
-                        response = requests.post(
-                            endpoint, json=payload, headers=headers
-                        )
-                        if response.status_code == 429:
-                            retries += 1
-                            print(
-                                f"⚠️ Quota exceeded (429) for model"
-                                f" '{model}'. Skipping to next candidate..."
-                            )
-                            continue
-                        response.raise_for_status()
-                        data = response.json()
-                        if "error" in data:
-                            retries += 1
-                            print(
-                                f"⚠️ API Error: {data['error'].get('message')}"
-                            )
-                            continue
-                        print(
-                            f"✅ Success with [{provider['name']}]"
-                            f" | Model: {model}"
-                        )
-                        data["url"] = provider["base_url"]
-                        return (data, retries)
+                        for attemp in range(max_retries):
+                            try:
+                                response = requests.post(
+                                    endpoint,
+                                    json=payload,
+                                    headers=headers,
+                                    timeout=30,
+                                )
+                                if response.status_code == 429:
+                                    retries += 1
+                                    print(
+                                        f"⚠️ Quota exceeded (429) for model"
+                                        f" '{model}'. Skipping to next candidate..."
+                                    )
+                                    break
+                                response.raise_for_status()
+                                data = response.json()
+                                if "error" in data:
+                                    print(
+                                        f"⚠️ API Error: {data['error'].get('message')}"
+                                    )
+                                    raise RuntimeError(
+                                        data["error"].get("message")
+                                    )
+
+                                print(
+                                    f"✅ Success with [{provider['name']}]"
+                                    f" | Model: {model}"
+                                )
+                                data["url"] = provider["base_url"]
+                                return (data, retries)
+                            except Exception as err:
+                                retries += 1
+                                print(
+                                    f"attempt {attemp + 1}/{max_retries} faild {err}"
+                                )
+                                if attemp < max_retries - 1:
+                                    time.sleep(2)
+                                else:
+                                    last_error = err
+                                    print(
+                                        f"Failed after {max_retries} attempt on model {model}"
+                                    )
+
                     except Exception as err:
                         retries += 1
                         last_error = err

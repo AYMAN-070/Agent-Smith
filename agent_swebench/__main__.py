@@ -1,6 +1,8 @@
 import argparse
 import os
 from pathlib import Path
+import signal
+import sys
 import shlex
 
 from src.agent.loop import SWEAgentLoop
@@ -60,6 +62,15 @@ def main() -> None:
     docker_container = DockerContainer(task.docker_image)
     sandbox = SandboxExecutor()
 
+    def clean_exit(signum, frame):
+        print("\n Kill signal receive, cleaning in process")
+        docker_container.stop_and_remove()
+        sandbox.close()
+        sys.exit(143)
+
+    signal.signal(signal.SIGTERM, clean_exit)
+    signal.signal(signal.SIGINT, clean_exit)
+
     try:
         container_id = docker_container.start()
         docker_container.setup_eval_script(task.eval_script)
@@ -86,9 +97,6 @@ def main() -> None:
     finally:
         sandbox.close()
         docker_container.stop_and_remove()
-    # llm_request = LlmRequest(parser.model_name, parser.provider_url)
-
-    # llm = LlmRequest(parser.model_name, parser.provider_url)
 
 
 if __name__ == "__main__":
