@@ -178,7 +178,7 @@ class MBPPAgentLoop:
         )
         Path(self.output_path).write_text(
             solution_output.model_dump_json(indent=2), encoding="utf-8"
-        )ficoba
+        )
         return "didnt succeed"
 
     def record_step(

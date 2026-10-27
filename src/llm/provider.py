@@ -47,6 +47,12 @@ class Provider:
         else:
             self.provider = [
                 {
+                    "name": "Grok",
+                    "base_url": "https://api.groq.com/openai/v1",
+                    "api_keys": grok_keys,
+                    "models": ["llama-3.3-70b-versatile"],
+                },
+                {
                     "name": "NVIDIA",
                     "base_url": "https://integrate.api.nvidia.com/v1",
                     "api_keys": nvidia_keys,
@@ -70,15 +76,9 @@ class Provider:
                     "base_url": "https://openrouter.ai/api/v1",
                     "api_keys": openai_keys,
                     "models": [
-                        "meta-llama/llama-3.3-70b-instruct",
                         "openai/gpt-4o",
+                        "meta-llama/llama-3.3-70b-instruct",
                     ],
-                },
-                {
-                    "name": "Groq",
-                    "base_url": "https://api.groq.com/openai/v1",
-                    "api_keys": grok_keys,
-                    "models": ["llama-3.3-70b-versatile"],
                 },
             ]
 
