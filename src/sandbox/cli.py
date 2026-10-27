@@ -3,7 +3,8 @@
 import argparse
 import json
 import sys
-from typing import Any, Dict, Optional
+from typing import Any
+
 from src.models import SandboxConfig
 from src.sandbox.executor import SandboxExecutor
 
@@ -34,7 +35,7 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_config(config_path: Optional[str]) -> SandboxConfig:
+def load_config(config_path: str | None) -> SandboxConfig:
     """Loads SandboxConfig from a JSON file if
     provided, otherwise returns default config."""
     if config_path:
@@ -53,14 +54,14 @@ def load_config(config_path: Optional[str]) -> SandboxConfig:
 
 def run_interactive_repl(
     executor: SandboxExecutor,
-    custom_modules: Optional[Dict[str, Any]] = None,
+    custom_modules: dict[str, Any] | None = None,
 ) -> None:
     """Runs the Read-Eval-Print Loop (REPL) for the sandbox in an isolated worker process."""
 
     print("=== Agent Smith Interactive Sandbox ===")
     print("Type 'exit' or use Ctrl+D to quit.")
 
-    persistent_env: Dict[str, Any] = {}
+    persistent_env: dict[str, Any] = {}
     code_preamble: list[str] = []
 
     while True:
@@ -127,9 +128,7 @@ def main() -> None:
         if executor.mcp_client:
             tools_list = list(executor.tool_wrappers.keys())
             transport_info = (
-                f"HTTP ({args.mcp_server})"
-                if args.mcp_server
-                else "stdio"
+                f"HTTP ({args.mcp_server})" if args.mcp_server else "stdio"
             )
             print(
                 f"Connected to MCP server via {transport_info}."

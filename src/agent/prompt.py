@@ -1,7 +1,8 @@
 """Prompt builders for MBPP and SWE-bench agent conversations."""
 
+from typing import Any
+
 from src.models import MBPPTaskInput
-from typing import Any, Optional
 
 
 class PromptBuilder:
@@ -10,7 +11,7 @@ class PromptBuilder:
     def __init__(
         self,
         task: MBPPTaskInput,
-        tools_manual: Optional[str] = None,
+        tools_manual: str | None = None,
     ) -> None:
         """Initialize prompt builder with task data and optional tools manual."""
         self.task = task
@@ -142,7 +143,7 @@ class SWEPromptBuilder:
     def __init__(
         self,
         issue_description: str,
-        tools_manual: Optional[str] = None,
+        tools_manual: str | None = None,
     ) -> None:
         """Initialize SWE prompt builder with issue description and optional tools manual."""
         self.issue_description = issue_description

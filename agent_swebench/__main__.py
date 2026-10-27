@@ -2,10 +2,10 @@
 
 import argparse
 import os
-from pathlib import Path
+import shlex
 import signal
 import sys
-import shlex
+from pathlib import Path
 from typing import Any
 
 from src.agent.loop import SWEAgentLoop

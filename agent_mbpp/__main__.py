@@ -1,11 +1,12 @@
 """CLI entry point for running the MBPP agent."""
 
 import argparse
-from pathlib import Path
 import shlex
-from typing import Any
-import sys
 import signal
+import sys
+from pathlib import Path
+from typing import Any
+
 from src.agent.loop import MBPPAgentLoop
 from src.models import MBPPTaskInput
 from src.sandbox.executor import SandboxExecutor

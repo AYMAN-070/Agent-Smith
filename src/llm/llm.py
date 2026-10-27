@@ -21,7 +21,9 @@ class LlmResponse:
         self.retries = retries
 
         self.llm_output: str = data["choices"][0]["message"]["content"]
-        print(f"////////////////////////////////////////////// \n\n {self.llm_output}\n\n\n\n")
+        print(
+            f"////////////////////////////////////////////// \n\n {self.llm_output}\n\n\n\n"
+        )
         self.code: str = self.parse(self.llm_output)
         self.url = data["url"]
 
