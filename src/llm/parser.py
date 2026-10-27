@@ -47,9 +47,7 @@ class ResponseParser:
             r'<parameter(?:\s+name=["\'](?P<key>[^"\']+)["\'])?>'
             r"(?P<val>.*?)</parameter>"
         )
-        param_matches = list(
-            re.finditer(param_pattern, params_str, re.DOTALL)
-        )
+        param_matches = list(re.finditer(param_pattern, params_str, re.DOTALL))
 
         if param_matches:
             for p in param_matches:
@@ -70,9 +68,7 @@ class ResponseParser:
         return self._format_call(name, args)
 
     def react(self, action: str, raw_input: str) -> str:
-        clean_input = re.sub(
-            r"^```[a-zA-Z]*\n?|```$", "", raw_input
-        ).strip()
+        clean_input = re.sub(r"^```[a-zA-Z]*\n?|```$", "", raw_input).strip()
         try:
             args = json.loads(clean_input)
         except Exception:
@@ -95,9 +91,7 @@ class ResponseParser:
         )
         match = re.search(xml_pattern, llm_output, re.DOTALL | re.IGNORECASE)
         if match:
-            return self.xml(
-                match.group("name").strip(), match.group("params")
-            )
+            return self.xml(match.group("name").strip(), match.group("params"))
 
         # 3. ReAct format (Action: / Action Input:)
         react_pattern = (
