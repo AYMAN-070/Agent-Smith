@@ -53,9 +53,15 @@ class MBPPAgentLoop:
             )
             code_for_sandbox = llm_response.code
             print("\n📥 [LLM Generated Code]:")
-            print(code_for_sandbox if code_for_sandbox else "(No Python code detected)")
+            print(
+                code_for_sandbox
+                if code_for_sandbox
+                else "(No Python code detected)"
+            )
             if not code_for_sandbox:
-                print("⚠️  [Warning]: No code block detected. Prompting LLM to format correctly.")
+                print(
+                    "⚠️  [Warning]: No code block detected. Prompting LLM to format correctly."
+                )
                 feedback = (
                     "Error: No executable Python code block was detected in your response.\n"
                     "You MUST wrap your Python code in ```python\n<code here>\n```.\n"
@@ -64,8 +70,14 @@ class MBPPAgentLoop:
                 self.prompt.add_model_response(llm_response.llm_output)
                 self.prompt.add_error_feedback(feedback)
 
-                sand_answer = {"status": "error", "error": "No Python code found", "output": ""}
-                steps_metric.append(self.record_step(llm_response, sand_answer, step))
+                sand_answer = {
+                    "status": "error",
+                    "error": "No Python code found",
+                    "output": "",
+                }
+                steps_metric.append(
+                    self.record_step(llm_response, sand_answer, step)
+                )
                 current_loop += 1
                 continue
 
@@ -223,9 +235,6 @@ class MBPPAgentLoop:
         return solution_output
 
 
-AgentLoop = MBPPAgentLoop
-
-
 class SWEAgentLoop:
     """Iterative agent loop for solving SWE-bench software engineering tasks."""
 
@@ -267,9 +276,15 @@ class SWEAgentLoop:
             llm_response = self.llm_request.generate_code(self.prompt)
             code_for_sandbox = llm_response.code
             print("\n📥 [LLM Generated Code]:")
-            print(code_for_sandbox if code_for_sandbox else "(No Python code detected)")
+            print(
+                code_for_sandbox
+                if code_for_sandbox
+                else "(No Python code detected)"
+            )
             if not code_for_sandbox:
-                print("⚠️  [Warning]: No code block detected. Prompting LLM to format correctly.")
+                print(
+                    "⚠️  [Warning]: No code block detected. Prompting LLM to format correctly."
+                )
                 feedback = (
                     "Error: No executable Python code block was detected in your response.\n"
                     "You MUST wrap your Python code in ```python\n<code here>\n```.\n"
@@ -278,8 +293,14 @@ class SWEAgentLoop:
                 self.prompt.add_model_response(llm_response.llm_output)
                 self.prompt.add_feedback(feedback)
 
-                sand_answer = {"status": "error", "error": "No Python code found", "output": ""}
-                steps_metric.append(self.record_step(llm_response, sand_answer, step))
+                sand_answer = {
+                    "status": "error",
+                    "error": "No Python code found",
+                    "output": "",
+                }
+                steps_metric.append(
+                    self.record_step(llm_response, sand_answer, step)
+                )
                 current_loop += 1
                 continue
 

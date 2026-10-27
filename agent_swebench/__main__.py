@@ -60,9 +60,6 @@ def main() -> None:
     """Run the SWE-bench agent workflow."""
     args = parse_arguments()
     task_content = Path(args.task_file).read_text(encoding="utf-8")
-    # Optional AgentArgs instance (currently unused)
-    # parser = AgentArgs("Agent SWE")
-    # task_content = Path(parser.task_file).read_text(encoding="utf-8")
     task = SWEBenchTaskInput.model_validate_json(task_content)
     docker_container = DockerContainer(task.docker_image)
     sandbox = SandboxExecutor()

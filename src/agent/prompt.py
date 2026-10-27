@@ -16,7 +16,6 @@ class PromptBuilder:
         self.task = task
         self.tools_manual = tools_manual
         self.extract_task()
-        self.messages: list[dict[str, str]] = []
         self.build_initial_payload()
 
     def extract_task(self) -> None:
