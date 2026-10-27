@@ -1,9 +1,5 @@
-<<<<<<< HEAD
 """LLM request dispatcher and response parser."""
 
-import re
-=======
->>>>>>> dev
 import time
 from typing import Any
 
