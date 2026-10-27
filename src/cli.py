@@ -1,9 +1,13 @@
+"""Command-line argument parser helper for agents."""
+
 import argparse
 
 
 class AgentArgs:
-    def __init__(self, description: str) -> None:
+    """Parses and stores common CLI arguments for agent runners."""
 
+    def __init__(self, description: str) -> None:
+        """Initialize argument parser with the provided description."""
         parser = argparse.ArgumentParser(description=description)
 
         parser.add_argument(

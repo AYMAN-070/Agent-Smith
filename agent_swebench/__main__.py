@@ -1,3 +1,5 @@
+"""CLI entry point for running the SWE-bench agent."""
+
 import argparse
 import os
 from pathlib import Path
@@ -13,6 +15,7 @@ from src.sandbox.executor import SandboxExecutor
 
 
 def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments for the SWE-bench agent."""
     parser = argparse.ArgumentParser(description="Agent Smith SWE-bench CLI")
     parser.add_argument(
         "--task-file",
@@ -54,6 +57,7 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the SWE-bench agent workflow."""
     args = parse_arguments()
     task_content = Path(args.task_file).read_text(encoding="utf-8")
     # Optional AgentArgs instance (currently unused)
@@ -64,6 +68,7 @@ def main() -> None:
     sandbox = SandboxExecutor()
 
     def clean_exit(signum: int, frame: Any) -> None:
+        """Handle termination signals and cleanup container and sandbox."""
         print("\nKill signal received, cleaning in progress...")
         docker_container.stop_and_remove()
         sandbox.close()

@@ -1,3 +1,5 @@
+"""Multi-provider LLM API client with fallback cascade."""
+
 import os
 from typing import Any
 import time
@@ -9,9 +11,12 @@ load_dotenv()
 
 
 class Provider:
+    """Dispatches chat completion requests across multiple LLM providers."""
+
     def __init__(
         self, model: str | None = None, provider: str | None = None
     ) -> None:
+        """Initialize provider configurations and API keys from environment."""
         gemini_keys = [
             val
             for key, val in os.environ.items()
@@ -78,6 +83,7 @@ class Provider:
             ]
 
     def send_request(self, payload: dict[str, Any]) -> tuple[Any, int]:
+        """Send chat completion request trying providers and models in cascade."""
         retries = 0
         max_retries = 3
         last_error = None

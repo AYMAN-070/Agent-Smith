@@ -1,3 +1,5 @@
+"""Docker container manager for isolated benchmark evaluation."""
+
 import subprocess
 
 
@@ -5,6 +7,7 @@ class DockerContainer:
     """Manages Docker container lifecycle for SWE-bench evaluation."""
 
     def __init__(self, image_name: str) -> None:
+        """Initialize Docker container manager with the target image name."""
         self.image_name = image_name
         self.container_id: str | None = None
 

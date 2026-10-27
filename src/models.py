@@ -1,3 +1,5 @@
+"""Pydantic data models for tasks, sandbox configs, metrics, and solutions."""
+
 from datetime import datetime
 
 from pydantic import BaseModel, Field

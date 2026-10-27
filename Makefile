@@ -1,4 +1,4 @@
-SRC := src agent_mbpp agent_swebench
+SRC := src agent_mbpp agent_swebench mcp_tools_mbpp.py mcp_tools_swebench.py
 
 all: help
 
@@ -45,8 +45,6 @@ fclean: clean
 	rm -rf .venv
 
 re: fclean install
-
-.PHONY: all help install lint sandbox sandbox-mbpp sandbox-swe run-mbpp run-swe clean fclean re
 
 .PHONY: all help install lint sandbox sandbox-mbpp sandbox-swe run-mbpp run-swe clean fclean re
 

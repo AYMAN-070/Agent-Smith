@@ -1,3 +1,5 @@
+"""Tool wrapper generating callable Python functions from MCP tool schemas."""
+
 from typing import Any, Callable, Dict, List
 from src.mcp.client import MCPClient
 
@@ -7,6 +9,7 @@ class ToolWrapper:
     """
 
     def __init__(self, client: MCPClient, tool_schema: Dict[str, Any]) -> None:
+        """Initialize tool wrapper with client and schema definition."""
         self.client = client
         self.name: str = tool_schema.get("name", "")
         self.__name__ = self.name

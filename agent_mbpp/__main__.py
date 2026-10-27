@@ -1,3 +1,5 @@
+"""CLI entry point for running the MBPP agent."""
+
 import argparse
 from pathlib import Path
 import shlex
@@ -10,6 +12,7 @@ from src.sandbox.executor import SandboxExecutor
 
 
 def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments for the MBPP agent."""
     parser = argparse.ArgumentParser(description="Agent Smith MBPP CLI")
     parser.add_argument(
         "--task-file",
@@ -51,6 +54,7 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the MBPP agent workflow."""
     args = parse_arguments()
     task_content = Path(args.task_file).read_text(encoding="utf-8")
     task = MBPPTaskInput.model_validate_json(task_content)
@@ -58,6 +62,7 @@ def main() -> None:
     sandbox = SandboxExecutor()
 
     def clean_exit(signum: int, frame: Any) -> None:
+        """Handle termination signals and cleanup sandbox."""
         print("\nKill signal received, cleaning in progress...")
         sandbox.close()
         sys.exit(143)

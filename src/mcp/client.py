@@ -1,3 +1,5 @@
+"""MCP client implementations over stdio and HTTP."""
+
 import json
 import shlex
 import subprocess
@@ -8,6 +10,7 @@ class MCPClient:
     """Client for Model Context Protocol (MCP) servers communicating over stdio."""
 
     def __init__(self, command: str) -> None:
+        """Initialize stdio MCP client with the server launch command."""
         self.command = command
         self.process: Optional[subprocess.Popen[str]] = None
         self._request_id = 0
@@ -29,6 +32,7 @@ class MCPClient:
         self._initialize()
 
     def _next_id(self) -> int:
+        """Generate and return the next JSON-RPC request identifier."""
         self._request_id += 1
         return self._request_id
 
@@ -157,6 +161,7 @@ class HttpMCPClient:
     """Client for Model Context Protocol (MCP) servers communicating over HTTP."""
 
     def __init__(self, server_url: str) -> None:
+        """Initialize HTTP MCP client with target server URL."""
         self.server_url = server_url.rstrip("/")
         self._request_id = 0
         self.tools: List[Dict[str, Any]] = []
@@ -164,6 +169,7 @@ class HttpMCPClient:
         self.prompts: List[Dict[str, Any]] = []
 
     def _next_id(self) -> int:
+        """Generate and return the next JSON-RPC request identifier."""
         self._request_id += 1
         return self._request_id
 

@@ -1,3 +1,5 @@
+"""Isolated code execution sandbox with security constraints and resource limits."""
+
 import builtins
 import io
 import multiprocessing
@@ -63,6 +65,7 @@ class FinalAnswerException(Exception):
     """Signal that the executed code has returned its final answer."""
 
     def __init__(self, answer: Any) -> None:
+        """Initialize exception with final answer payload."""
         super().__init__()
         self.answer = answer
 
@@ -85,6 +88,7 @@ def create_safe_import(
         fromlist: Sequence[str] = (),
         level: int = 0,
     ) -> Any:
+        """Validate module name against allowed patterns before importing."""
         allowed = any(
             name == module
             or (module.endswith(".*") and name.startswith(module[:-2] + "."))
@@ -107,6 +111,7 @@ def create_safe_open(
     real_open = builtins.open
 
     def safe_open(file: Any, *args: Any, **kwargs: Any) -> Any:
+        """Validate file path against allowed directories before opening."""
         if not isinstance(file, (str, Path)):
             raise PermissionError(
                 "Sandbox security: only string and Path filenames are allowed."
@@ -155,10 +160,14 @@ def apply_network_block() -> None:
     """Disable all inbound and outbound network access in the worker process."""
 
     class BlockedSocket:
+        """Dummy socket class that disallows all socket instantiations."""
+
         def __init__(self, *args: Any, **kwargs: Any) -> None:
+            """Raise PermissionError on socket creation."""
             raise PermissionError("Sandbox security: network access is forbidden.")
 
     def blocked_func(*args: Any, **kwargs: Any) -> Any:
+        """Raise PermissionError on blocked network operations."""
         raise PermissionError("Sandbox security: network access is forbidden.")
 
     import socket
@@ -244,6 +253,7 @@ class SandboxExecutor:
     """Run Python code in a separate process with resource limits and timeout."""
 
     def __init__(self, config: Optional[SandboxConfig] = None) -> None:
+        """Initialize sandbox executor with optional configuration."""
         self.config = config if config is not None else SandboxConfig()
         self.tool_wrappers: dict[str, Any] = {}
         self.mcp_client: Any = None

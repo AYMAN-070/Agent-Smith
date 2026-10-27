@@ -1,3 +1,5 @@
+"""Agent execution loops for MBPP and SWE-bench tasks."""
+
 import time
 from pathlib import Path
 from typing import Any
@@ -14,6 +16,8 @@ from src.sandbox.executor import SandboxExecutor
 
 
 class MBPPAgentLoop:
+    """Iterative agent loop for solving MBPP programming tasks."""
+
     def __init__(
         self,
         task: MBPPTaskInput,
@@ -22,6 +26,7 @@ class MBPPAgentLoop:
         model_name: str | None = None,
         provider_url: str | None = None,
     ) -> None:
+        """Initialize MBPP agent loop with task, sandbox, and optional model config."""
         self.task = task
         self.sandbox = sandbox
         self.output_path = output_path
@@ -29,6 +34,7 @@ class MBPPAgentLoop:
         self.llm_request = LlmRequest(model_name, provider_url)
 
     def run(self) -> str:
+        """Execute the iterative loop to solve the MBPP task."""
         start_time = time.time()
         steps_metric: list[StepMetrics] = []
         max_loop = 10
@@ -166,6 +172,7 @@ class MBPPAgentLoop:
     def record_step(
         self, llm: LlmResponse, sandbox: dict[str, Any], step: int
     ) -> StepMetrics:
+        """Record metrics and execution output for an iteration step."""
         raw_output = (
             sandbox.get("output")
             or sandbox.get("error")
@@ -193,6 +200,7 @@ class MBPPAgentLoop:
         total_time_seconds: float,
         error: str | None = None,
     ) -> SolutionOutput:
+        """Construct final SolutionOutput model from execution metrics."""
         total_iteration = len(steps)
         total_requests = len(steps) + sum(s.retries for s in steps)
         total_input_tokens = sum(s.input_tokens for s in steps)
@@ -219,6 +227,8 @@ AgentLoop = MBPPAgentLoop
 
 
 class SWEAgentLoop:
+    """Iterative agent loop for solving SWE-bench software engineering tasks."""
+
     def __init__(
         self,
         task: SWEBenchTaskInput,
@@ -240,6 +250,7 @@ class SWEAgentLoop:
         self.llm_request = LlmRequest(model_name, provider_url)
 
     def run(self) -> str:
+        """Execute the iterative loop to resolve the SWE-bench issue."""
         start_time = time.time()
         steps_metric: list[StepMetrics] = []
         max_loop = 30
@@ -378,6 +389,7 @@ class SWEAgentLoop:
     def record_step(
         self, llm: LlmResponse, sandbox: dict[str, Any], step: int
     ) -> StepMetrics:
+        """Record metrics and execution output for an iteration step."""
         raw_output = (
             sandbox.get("output")
             or sandbox.get("error")
@@ -405,6 +417,7 @@ class SWEAgentLoop:
         total_time_seconds: float,
         error: str | None = None,
     ) -> SolutionOutput:
+        """Construct final SolutionOutput model from execution metrics."""
         total_iteration = len(steps)
         total_requests = len(steps) + sum(s.retries for s in steps)
         total_input_tokens = sum(s.input_tokens for s in steps)

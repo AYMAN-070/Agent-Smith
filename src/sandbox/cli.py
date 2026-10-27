@@ -1,3 +1,5 @@
+"""Interactive REPL command-line interface for the sandbox."""
+
 import argparse
 import json
 import sys
@@ -112,6 +114,7 @@ def run_interactive_repl(
 
 
 def main() -> None:
+    """Entry point for the sandbox CLI."""
     args = parse_arguments()
     config = load_config(args.config_file)
 
