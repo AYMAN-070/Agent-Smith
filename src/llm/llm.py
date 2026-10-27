@@ -1,10 +1,14 @@
+<<<<<<< HEAD
 """LLM request dispatcher and response parser."""
 
 import re
+=======
+>>>>>>> dev
 import time
 from typing import Any
 
 from src.agent.prompt import PromptBuilder, SWEPromptBuilder
+from src.llm.parser import ResponseParser
 from src.llm.provider import Provider
 
 
@@ -32,13 +36,7 @@ class LlmResponse:
         self.output_tokens: int = usage.get("completion_tokens", 0)
 
     def parse(self, llm_text: str) -> str:
-        """Extract executable Python code from markdown code blocks in text."""
-        pattern = r"```(?:python|py)?\s*\n(.*?)```"
-        match = re.search(pattern, llm_text, re.DOTALL | re.IGNORECASE)
-        if match:
-            python_code = match.group(1).strip()
-            return python_code
-        return ""
+        return ResponseParser.parse(llm_text)
 
 
 class LlmRequest:
