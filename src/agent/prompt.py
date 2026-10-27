@@ -100,41 +100,54 @@ class PromptBuilder:
         }
         self.payload["messages"].append(assistant_message)
 
-    def add_error_feedback(self, trace: str) -> None:
-        """Append sandbox execution output or error trace as user feedback."""
+    def add_error_feedback(
+        self,
+        trace: str,
+        step: int = 0,
+        max_steps: int = 0,
+    ) -> None:
+        """Append sandbox output or error trace as feedback with budget."""
         type_error_hint = ""
         if "string indices must be integers" in trace or "TypeError" in trace:
             type_error_hint = (
-                "\nCRITICAL NOTE: `run_tests` returns a JSON string, NOT a dict.\n"
-                "Do NOT do `res['success']`! Simply `print(res)` to see test results, "
-                "or use `json.loads(res)`.\n"
+                "\nCRITICAL NOTE: `run_tests` returns a JSON string, "
+                "NOT a dict.\nDo NOT do `res['success']`! "
+                "Simply `print(res)` or use `json.loads(res)`.\n"
             )
 
+        step_header = (
+            f"[STEP {step}/{max_steps}] " if step and max_steps else ""
+        )
+        reminder = ""
+        if step and max_steps:
+            remaining = max_steps - step
+            if remaining <= 2:
+                reminder = (
+                    f"\n\n⚠️ URGENCY ALERT: Only {remaining} step(s) left! "
+                    "If tests pass, submit with final_answer(solution_code)."
+                )
+            elif step % 5 == 0:
+                reminder = (
+                    f"\n\n🔔 REMINDER (Step {step}/{max_steps}):\n"
+                    "1. Test candidate with run_tests(candidate, tests).\n"
+                    "2. Do NOT combine run_tests and final_answer.\n"
+                    "3. Submit with final_answer(solution_code) after tests pass."
+                )
+
         feedback_text = (
-            f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n{type_error_hint}\n"
-            "INSTRUCTIONS FOR NEXT STEP:\n"
-            "1. If tests failed, analyze the failure, correct"
-            " your algorithm, and RE-TEST using:\n"
-            "   ```python\n"
-            "   candidate = '''\n"
-            "   def your_function(...):\n"
-            "       ...\n"
-            "   '''\n"
-            "   res = run_tests(candidate, tests)\n"
-            "   print(res)\n"
-            "   ```\n"
-            "2. If all tests PASSED, call final_answer with"
-            " your clean function code:\n"
-            "   ```python\n"
-            "   final_answer('''def your_function(...):\n"
-            "       ...\n"
-            "   ''')\n"
-            "   ```\n"
-            "IMPORTANT: Do not just define the function. You MUST"
-            " either print(run_tests(...)) or call final_answer(...)."
+            f"{step_header}OBSERVATION:\n{trace}{type_error_hint}{reminder}"
         )
         feedback: dict[str, Any] = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)
+
+    def add_feedback(
+        self,
+        observation: str,
+        step: int = 0,
+        max_steps: int = 0,
+    ) -> None:
+        """Alias for add_error_feedback for uniform interface."""
+        self.add_error_feedback(observation, step=step, max_steps=max_steps)
 
 
 class SWEPromptBuilder:
@@ -167,11 +180,23 @@ class SWEPromptBuilder:
             "You are an autonomous Software Engineer Agent solving real-world GitHub issues.\n"
             "You operate in a secure Python sandbox attached to the project's repository.\n\n"
             f"{manual_section}\n\n"
+            "WORKFLOW GUIDELINES:\n"
+            "1. LOCATE: Use `search_code` and `read_file` to locate the exact source of the bug.\n"
+            "2. EDIT: Use `edit_file` to apply a minimal, surgical fix.\n"
+            "3. VERIFY: Run `run_tests()` to confirm the issue is fixed and no regressions occur.\n"
+            "4. SUBMIT: Check `print(get_patch())` to verify your diff, then call `final_answer(get_patch())`.\n\n"
             "CRITICAL EXECUTION RULES:\n"
-            "1. To interact with the repository, you must write a Python script that uses these tools, prints the result, and wait for the sandbox observation.\n"
-            "2. NEVER call final_answer and exploration/edit tools in the same script. Inspect test results first, and call final_answer in a separate step once verified.\n"
-            "3. When you have fixed the bug and verified with run_tests(), retrieve and submit your patch using:\n"
-            "   final_answer(get_patch())\n\n"
+            "1. All tools are callable directly as global Python functions (no import required).\n"
+            "2. DO NOT use `import` (e.g. `import os`, `import sys`, or library imports) and DO NOT use `open()`.\n"
+            "   Sandbox security forbids them. Interact with the repo ONLY via provided tools (`read_file`, `edit_file`, `list_files`).\n"
+            "3. Every script MUST produce observable output by using `print()` for tool results.\n"
+            "4. When using `edit_file`, `old_str` must be exact code WITHOUT line numbers from `read_file`.\n"
+            "5. Make minimal changes: do not reformat unrelated code or rewrite working functions.\n"
+            "6. Use relative paths from repository root (e.g. 'src/module.py').\n"
+            "7. To test, ALWAYS use `run_tests()`. NEVER run `pip install` or modify the environment (this will break package dependencies).\n"
+            "8. Once your fix is verified, STOP and SUBMIT: inspect with `print(get_patch())` then call `final_answer(get_patch())`.\n"
+            "   Do NOT look for new issues or attempt endless refactoring.\n"
+            "9. NEVER call final_answer and exploration/edit tools in the same script.\n\n"
             "EXAMPLE - Investigating the repository:\n"
             "```python\n"
             "print(list_files('.', '*.py'))\n"
@@ -186,7 +211,12 @@ class SWEPromptBuilder:
 
         user_content = (
             f"ISSUE DESCRIPTION:\n{self.issue_description}\n\n"
-            "Start by exploring the repository to find where the bug is located. Write your first Python script to search or read files."
+            "INSTRUCTIONS:\n"
+            "1. Locate the bug using `search_code` and `read_file`.\n"
+            "2. DO NOT run Python snippets from the issue with `import`.\n"
+            "3. Apply your fix with `edit_file`.\n"
+            "4. Verify with `run_tests()`.\n"
+            "5. Submit your fix with `final_answer(get_patch())`."
         )
 
         self.payload: dict[str, Any] = {
@@ -207,15 +237,36 @@ class SWEPromptBuilder:
         }
         self.payload["messages"].append(assistant_message)
 
-    def add_feedback(self, trace: str) -> None:
-        """Append sandbox execution observation as user feedback."""
-        feedback_text = (
-            f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n\n"
-            "INSTRUCTIONS FOR NEXT STEP:\n"
-            "Analyze the output above. If you need more information, write another Python script using `read_file`, `search_code`, or `run_command`.\n"
-            "If you found the bug, use `edit_file` to fix it and verify with `run_tests()`.\n"
-            "If tests pass and the fix is verified, retrieve and submit your patch with `final_answer(get_patch())`.\n"
-            "Remember: Output ONLY valid python code enclosed in ```python ... ```."
+    def add_feedback(
+        self,
+        observation: str,
+        step: int = 0,
+        max_steps: int = 0,
+    ) -> None:
+        """Append sandbox observation with step budget and reminders."""
+        step_header = (
+            f"[STEP {step}/{max_steps}] " if step and max_steps else ""
         )
+        reminder = ""
+        if step and max_steps:
+            remaining = max_steps - step
+            if remaining <= 5:
+                reminder = (
+                    f"\n\n⚠️ URGENCY ALERT: Only {remaining} step(s) left! "
+                    "Stop exploring or modifying packages.\n"
+                    "Inspect your diff with print(get_patch()) and submit "
+                    "NOW with final_answer(get_patch())."
+                )
+            elif step % 10 == 0:
+                reminder = (
+                    f"\n\n🔔 RULES REMINDER (Step {step}/{max_steps}):\n"
+                    "1. DO NOT run pip install or download packages.\n"
+                    "2. DO NOT run scripts with `import` in the sandbox.\n"
+                    "3. Use `edit_file` to apply minimal bug fixes.\n"
+                    "4. To test, use `run_tests()`, NOT manual bash pytest.\n"
+                    "5. Submit your fix with `final_answer(get_patch())`."
+                )
+
+        feedback_text = f"{step_header}OBSERVATION:\n{observation}{reminder}"
         feedback: dict[str, Any] = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)
