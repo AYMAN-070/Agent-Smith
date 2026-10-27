@@ -1,25 +1,32 @@
+"""Prompt builders for MBPP and SWE-bench agent conversations."""
+
+from typing import Any
+
 from src.models import MBPPTaskInput
-from typing import Any, Optional
 
 
 class PromptBuilder:
+    """Constructs and manages prompts for MBPP algorithmic tasks."""
+
     def __init__(
         self,
         task: MBPPTaskInput,
-        tools_manual: Optional[str] = None,
+        tools_manual: str | None = None,
     ) -> None:
+        """Initialize prompt builder with task data and optional tools manual."""
         self.task = task
         self.tools_manual = tools_manual
         self.extract_task()
-        self.messages: list[dict[str, str]] = []
         self.build_initial_payload()
 
     def extract_task(self) -> None:
+        """Extract problem description, function signature, and tests from task."""
         self.task_definition = self.task.task_definition
         self.function = self.task.function_definition
         self.test_list = self.task.test_list
 
     def build_initial_payload(self) -> None:
+        """Construct initial system and user messages payload."""
         formatted_tests = repr(self.test_list)
         manual_section = self.tools_manual or (
             "AVAILABLE TOOLS:\n"
@@ -86,6 +93,7 @@ class PromptBuilder:
         }
 
     def add_model_response(self, llm_text: str) -> None:
+        """Append LLM assistant response to the conversation history."""
         assistant_message: dict[str, Any] = {
             "role": "assistant",
             "content": llm_text,
@@ -93,6 +101,7 @@ class PromptBuilder:
         self.payload["messages"].append(assistant_message)
 
     def add_error_feedback(self, trace: str) -> None:
+        """Append sandbox execution output or error trace as user feedback."""
         type_error_hint = ""
         if "string indices must be integers" in trace or "TypeError" in trace:
             type_error_hint = (
@@ -129,16 +138,20 @@ class PromptBuilder:
 
 
 class SWEPromptBuilder:
+    """Constructs and manages prompts for SWE-bench issue resolution."""
+
     def __init__(
         self,
         issue_description: str,
-        tools_manual: Optional[str] = None,
+        tools_manual: str | None = None,
     ) -> None:
+        """Initialize SWE prompt builder with issue description and optional tools manual."""
         self.issue_description = issue_description
         self.tools_manual = tools_manual
         self.build_initial_payload()
 
     def build_initial_payload(self) -> None:
+        """Construct initial system instruction and issue statement payload."""
         manual_section = self.tools_manual or (
             "AVAILABLE TOOLS:\n"
             "- read_file(filepath: str, start_line: int, end_line: int) -> str\n"
@@ -187,6 +200,7 @@ class SWEPromptBuilder:
         }
 
     def add_model_response(self, llm_text: str) -> None:
+        """Append LLM assistant response to conversation history."""
         assistant_message: dict[str, Any] = {
             "role": "assistant",
             "content": llm_text,
@@ -194,6 +208,7 @@ class SWEPromptBuilder:
         self.payload["messages"].append(assistant_message)
 
     def add_feedback(self, trace: str) -> None:
+        """Append sandbox execution observation as user feedback."""
         feedback_text = (
             f"SANDBOX FEEDBACK / OBSERVATION:\n{trace}\n\n"
             "INSTRUCTIONS FOR NEXT STEP:\n"

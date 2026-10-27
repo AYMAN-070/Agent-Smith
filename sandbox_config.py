@@ -1,3 +1,5 @@
+"""Sandbox configuration model for resource limits and authorized modules."""
+
 from pydantic import BaseModel, Field
 from typing import List
 

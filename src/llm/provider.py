@@ -1,6 +1,8 @@
+"""Multi-provider LLM API client with fallback cascade."""
+
 import os
-from typing import Any
 import time
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
@@ -9,9 +11,12 @@ load_dotenv()
 
 
 class Provider:
+    """Dispatches chat completion requests across multiple LLM providers."""
+
     def __init__(
         self, model: str | None = None, provider: str | None = None
     ) -> None:
+        """Initialize provider configurations and API keys from environment."""
         gemini_keys = [
             val
             for key, val in os.environ.items()
@@ -42,6 +47,12 @@ class Provider:
         else:
             self.provider = [
                 {
+                    "name": "Grok",
+                    "base_url": "https://api.groq.com/openai/v1",
+                    "api_keys": grok_keys,
+                    "models": ["llama-3.3-70b-versatile"],
+                },
+                {
                     "name": "NVIDIA",
                     "base_url": "https://integrate.api.nvidia.com/v1",
                     "api_keys": nvidia_keys,
@@ -65,19 +76,14 @@ class Provider:
                     "base_url": "https://openrouter.ai/api/v1",
                     "api_keys": openai_keys,
                     "models": [
-                        "meta-llama/llama-3.3-70b-instruct",
                         "openai/gpt-4o",
+                        "meta-llama/llama-3.3-70b-instruct",
                     ],
-                },
-                {
-                    "name": "Groq",
-                    "base_url": "https://api.groq.com/openai/v1",
-                    "api_keys": grok_keys,
-                    "models": ["llama-3.3-70b-versatile"],
                 },
             ]
 
     def send_request(self, payload: dict[str, Any]) -> tuple[Any, int]:
+        """Send chat completion request trying providers and models in cascade."""
         retries = 0
         max_retries = 3
         last_error = None
@@ -99,7 +105,7 @@ class Provider:
                             "Content-Type": "application/json",
                         }
                         payload["model"] = model
-                        for attemp in range(max_retries):
+                        for attempt in range(max_retries):
                             try:
                                 response = requests.post(
                                     endpoint,
@@ -133,9 +139,9 @@ class Provider:
                             except Exception as err:
                                 retries += 1
                                 print(
-                                    f"attempt {attemp + 1}/{max_retries} faild {err}"
+                                    f"attempt {attempt + 1}/{max_retries} failed {err}"
                                 )
-                                if attemp < max_retries - 1:
+                                if attempt < max_retries - 1:
                                     time.sleep(2)
                                 else:
                                     last_error = err

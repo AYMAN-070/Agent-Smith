@@ -7,7 +7,7 @@ according to the Model Context Protocol (JSON-RPC 2.0).
 
 import json
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 MBPP_GUIDELINES_TEXT = """# MBPP (Mostly Basic Python Problems) Guidelines
 
@@ -76,20 +76,22 @@ TOOLS_SCHEMA = [
 ]
 
 
-def run_tests(code: str, test_list: List[str]) -> str:
+def run_tests(code: str, test_list: list[str]) -> str:
     """Run candidate Python code against a list of test assertions."""
-    execution_namespace: Dict[str, Any] = {}
+    execution_namespace: dict[str, Any] = {}
     try:
         exec(code, execution_namespace)
     except Exception as e:
-        return json.dumps({
-            "success": False,
-            "output": f"Code execution failed ({type(e).__name__}): {e}",
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "output": f"Code execution failed ({type(e).__name__}): {e}",
+            }
+        )
 
     passed = 0
     total = len(test_list)
-    failed_details: List[str] = []
+    failed_details: list[str] = []
 
     for assertion in test_list:
         try:
@@ -98,21 +100,28 @@ def run_tests(code: str, test_list: List[str]) -> str:
         except AssertionError:
             failed_details.append(f"Assertion failed: {assertion}")
         except Exception as e:
-            failed_details.append(f"Test error on '{assertion}' ({type(e).__name__}): {e}")
+            failed_details.append(
+                f"Test error on '{assertion}' ({type(e).__name__}): {e}"
+            )
 
     if passed == total:
-        return json.dumps({
-            "success": True,
-            "output": f"All {total} tests passed successfully.",
-        })
+        return json.dumps(
+            {
+                "success": True,
+                "output": f"All {total} tests passed successfully.",
+            }
+        )
     else:
-        return json.dumps({
-            "success": False,
-            "output": f"{passed}/{total} tests passed. Failures:\n" + "\n".join(failed_details),
-        })
+        return json.dumps(
+            {
+                "success": False,
+                "output": f"{passed}/{total} tests passed. Failures:\n"
+                + "\n".join(failed_details),
+            }
+        )
 
 
-def send_response(response: Dict[str, Any]) -> None:
+def send_response(response: dict[str, Any]) -> None:
     """Send JSON-RPC response to stdout."""
     sys.stdout.write(json.dumps(response) + "\n")
     sys.stdout.flush()
@@ -131,22 +140,24 @@ def handle_request(line: str) -> None:
 
     # Protocol initialization
     if method == "initialize":
-        send_response({
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {},
-                    "resources": {},
-                    "prompts": {},
+        send_response(
+            {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {},
+                        "resources": {},
+                        "prompts": {},
+                    },
+                    "serverInfo": {
+                        "name": "mcp_tools_mbpp",
+                        "version": "1.0.0",
+                    },
                 },
-                "serverInfo": {
-                    "name": "mcp_tools_mbpp",
-                    "version": "1.0.0",
-                },
-            },
-        })
+            }
+        )
         return
 
     # Client notification after initialization
@@ -155,13 +166,15 @@ def handle_request(line: str) -> None:
 
     # List available tools
     if method == "tools/list":
-        send_response({
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "tools": TOOLS_SCHEMA,
-            },
-        })
+        send_response(
+            {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "tools": TOOLS_SCHEMA,
+                },
+            }
+        )
         return
 
     # Execute a tool
@@ -174,79 +187,91 @@ def handle_request(line: str) -> None:
             test_list = arguments.get("test_list", [])
             output = run_tests(code, test_list)
 
-            send_response({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": output,
-                        }
-                    ],
-                },
-            })
+            send_response(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": output,
+                            }
+                        ],
+                    },
+                }
+            )
             return
         else:
-            send_response({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {
-                    "code": -32601,
-                    "message": f"Method/Tool '{tool_name}' not found.",
-                },
-            })
+            send_response(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": -32601,
+                        "message": f"Method/Tool '{tool_name}' not found.",
+                    },
+                }
+            )
             return
 
     # List available resources
     if method == "resources/list":
-        send_response({
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "resources": RESOURCES_SCHEMA,
-            },
-        })
+        send_response(
+            {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "resources": RESOURCES_SCHEMA,
+                },
+            }
+        )
         return
 
     # Read a resource
     if method == "resources/read":
         uri = params.get("uri")
         if uri == "mbpp://guidelines":
-            send_response({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "contents": [
-                        {
-                            "uri": uri,
-                            "mimeType": "text/markdown",
-                            "text": MBPP_GUIDELINES_TEXT,
-                        }
-                    ],
-                },
-            })
+            send_response(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "contents": [
+                            {
+                                "uri": uri,
+                                "mimeType": "text/markdown",
+                                "text": MBPP_GUIDELINES_TEXT,
+                            }
+                        ],
+                    },
+                }
+            )
             return
         else:
-            send_response({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {
-                    "code": -32602,
-                    "message": f"Resource '{uri}' not found.",
-                },
-            })
+            send_response(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": -32602,
+                        "message": f"Resource '{uri}' not found.",
+                    },
+                }
+            )
             return
 
     # List available prompts
     if method == "prompts/list":
-        send_response({
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "prompts": PROMPTS_SCHEMA,
-            },
-        })
+        send_response(
+            {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "prompts": PROMPTS_SCHEMA,
+                },
+            }
+        )
         return
 
     # Get a prompt
@@ -255,49 +280,55 @@ def handle_request(line: str) -> None:
         prompt_args = params.get("arguments", {})
         if prompt_name == "solve_mbpp_task":
             task_desc = prompt_args.get("task_prompt", "")
-            send_response({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "description": "Template prompt to guide solving an MBPP algorithmic task",
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": {
-                                "type": "text",
-                                "text": (
-                                    f"Please write a Python function that solves the following problem:\n"
-                                    f"{task_desc}\n\n"
-                                    "Make sure your function passes all test assertions and call "
-                                    "final_answer(code) when done."
-                                ),
-                            },
-                        }
-                    ],
-                },
-            })
+            send_response(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "description": "Template prompt to guide solving an MBPP algorithmic task",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": {
+                                    "type": "text",
+                                    "text": (
+                                        f"Please write a Python function that solves the following problem:\n"
+                                        f"{task_desc}\n\n"
+                                        "Make sure your function passes all test assertions and call "
+                                        "final_answer(code) when done."
+                                    ),
+                                },
+                            }
+                        ],
+                    },
+                }
+            )
             return
         else:
-            send_response({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {
-                    "code": -32602,
-                    "message": f"Prompt '{prompt_name}' not found.",
-                },
-            })
+            send_response(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": -32602,
+                        "message": f"Prompt '{prompt_name}' not found.",
+                    },
+                }
+            )
             return
 
     # Unknown method
     if req_id is not None:
-        send_response({
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "error": {
-                "code": -32601,
-                "message": f"Method '{method}' not found.",
-            },
-        })
+        send_response(
+            {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {
+                    "code": -32601,
+                    "message": f"Method '{method}' not found.",
+                },
+            }
+        )
 
 
 def main() -> None:

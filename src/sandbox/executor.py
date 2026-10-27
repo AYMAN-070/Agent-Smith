@@ -1,3 +1,5 @@
+"""Isolated code execution sandbox with security constraints and resource limits."""
+
 import builtins
 import io
 import multiprocessing
@@ -7,10 +9,9 @@ import traceback
 from collections.abc import Callable, Mapping, Sequence
 from multiprocessing.queues import Queue
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from src.models import SandboxConfig
-
 
 SAFE_BUILTINS: dict[str, Any] = {
     "print": print,
@@ -63,6 +64,7 @@ class FinalAnswerException(Exception):
     """Signal that the executed code has returned its final answer."""
 
     def __init__(self, answer: Any) -> None:
+        """Initialize exception with final answer payload."""
         super().__init__()
         self.answer = answer
 
@@ -85,6 +87,7 @@ def create_safe_import(
         fromlist: Sequence[str] = (),
         level: int = 0,
     ) -> Any:
+        """Validate module name against allowed patterns before importing."""
         allowed = any(
             name == module
             or (module.endswith(".*") and name.startswith(module[:-2] + "."))
@@ -107,6 +110,7 @@ def create_safe_open(
     real_open = builtins.open
 
     def safe_open(file: Any, *args: Any, **kwargs: Any) -> Any:
+        """Validate file path against allowed directories before opening."""
         if not isinstance(file, (str, Path)):
             raise PermissionError(
                 "Sandbox security: only string and Path filenames are allowed."
@@ -131,7 +135,7 @@ def create_safe_open(
 
 def create_safe_environment(
     config: SandboxConfig,
-    tools: Optional[dict[str, Any]] = None,
+    tools: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the globals dictionary used to execute code in the sandbox."""
     safe_builtins = SAFE_BUILTINS.copy()
@@ -155,10 +159,16 @@ def apply_network_block() -> None:
     """Disable all inbound and outbound network access in the worker process."""
 
     class BlockedSocket:
+        """Dummy socket class that disallows all socket instantiations."""
+
         def __init__(self, *args: Any, **kwargs: Any) -> None:
-            raise PermissionError("Sandbox security: network access is forbidden.")
+            """Raise PermissionError on socket creation."""
+            raise PermissionError(
+                "Sandbox security: network access is forbidden."
+            )
 
     def blocked_func(*args: Any, **kwargs: Any) -> Any:
+        """Raise PermissionError on blocked network operations."""
         raise PermissionError("Sandbox security: network access is forbidden.")
 
     import socket
@@ -173,7 +183,7 @@ def apply_network_block() -> None:
         "fromfd",
     ):
         setattr(socket, attr, blocked_func)
-    setattr(socket, "socket", BlockedSocket)
+    socket.socket = BlockedSocket
 
     try:
         import _socket
@@ -185,7 +195,7 @@ def apply_network_block() -> None:
             "getnameinfo",
         ):
             setattr(_socket, attr, blocked_func)
-        setattr(_socket, "socket", BlockedSocket)
+        _socket.socket = BlockedSocket
     except (ImportError, AttributeError):
         pass
 
@@ -201,8 +211,8 @@ def isolated_worker(
     code: str,
     config: SandboxConfig,
     queue: Queue[Any],
-    tools: Optional[dict[str, Any]] = None,
-    env: Optional[dict[str, Any]] = None,
+    tools: dict[str, Any] | None = None,
+    env: dict[str, Any] | None = None,
 ) -> None:
     """Execute code in a separate process and send its result through the queue."""
     output = io.StringIO()
@@ -243,7 +253,8 @@ def isolated_worker(
 class SandboxExecutor:
     """Run Python code in a separate process with resource limits and timeout."""
 
-    def __init__(self, config: Optional[SandboxConfig] = None) -> None:
+    def __init__(self, config: SandboxConfig | None = None) -> None:
+        """Initialize sandbox executor with optional configuration."""
         self.config = config if config is not None else SandboxConfig()
         self.tool_wrappers: dict[str, Any] = {}
         self.mcp_client: Any = None
@@ -251,16 +262,18 @@ class SandboxExecutor:
 
     def connect_mcp(
         self,
-        stdio_cmd: Optional[str] = None,
-        server_url: Optional[str] = None,
+        stdio_cmd: str | None = None,
+        server_url: str | None = None,
     ) -> None:
         """Connect to an MCP server and register its tools as local wrappers."""
         if server_url:
             from src.mcp.client import HttpMCPClient
+
             self.mcp_client = HttpMCPClient(server_url)
 
         elif stdio_cmd:
             from src.mcp.client import MCPClient
+
             self.mcp_client = MCPClient(stdio_cmd)
 
         if self.mcp_client:
@@ -295,8 +308,8 @@ class SandboxExecutor:
     def execute(
         self,
         code: str,
-        custom_modules: Optional[dict[str, Any]] = None,
-        env: Optional[dict[str, Any]] = None,
+        custom_modules: dict[str, Any] | None = None,
+        env: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute code in a worker process and return its result."""
         # MCP wrappers and caller-provided tools are available in the worker.

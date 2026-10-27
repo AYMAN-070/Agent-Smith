@@ -1,3 +1,5 @@
+"""Tool documentation generator for LLM system prompts."""
+
 from collections.abc import Mapping, Sequence
 from typing import Any
 

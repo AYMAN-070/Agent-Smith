@@ -1,3 +1,5 @@
+"""FastMCP server exposing SWE-bench development and testing tools."""
+
 import os
 import re
 import subprocess
