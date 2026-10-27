@@ -107,5 +107,9 @@ class ResponseParser:
         match = re.search(py_pattern, llm_output, re.DOTALL | re.IGNORECASE)
         if match:
             return match.group(1).strip()
-
-        return ""
+        clean_output = llm_output.strip()
+        try:
+            compile(clean_output, "<string>", "exec")
+            return clean_output
+        except SyntaxError:
+            return ""

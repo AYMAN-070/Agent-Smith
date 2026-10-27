@@ -25,9 +25,7 @@ class Provider:
         openai_keys = [
             val for key, val in os.environ.items() if key.startswith("OPEN")
         ]
-        grok_keys = [
-            val for key, val in os.environ.items() if key.startswith("GROK")
-        ]
+
         nvidia_keys = [
             val
             for key, val in os.environ.items()
@@ -35,7 +33,7 @@ class Provider:
         ]
 
         if model and provider:
-            keys = gemini_keys or openai_keys or grok_keys or nvidia_keys
+            keys = gemini_keys or openai_keys or nvidia_keys
             self.provider = [
                 {
                     "name": "Custom",
@@ -46,12 +44,6 @@ class Provider:
             ]
         else:
             self.provider = [
-                {
-                    "name": "Grok",
-                    "base_url": "https://api.groq.com/openai/v1",
-                    "api_keys": grok_keys,
-                    "models": ["llama-3.3-70b-versatile"],
-                },
                 {
                     "name": "NVIDIA",
                     "base_url": "https://integrate.api.nvidia.com/v1",
