@@ -105,7 +105,7 @@ class Provider:
                             "Content-Type": "application/json",
                         }
                         payload["model"] = model
-                        for attemp in range(max_retries):
+                        for attempt in range(max_retries):
                             try:
                                 response = requests.post(
                                     endpoint,
@@ -139,9 +139,9 @@ class Provider:
                             except Exception as err:
                                 retries += 1
                                 print(
-                                    f"attempt {attemp + 1}/{max_retries} faild {err}"
+                                    f"attempt {attempt + 1}/{max_retries} failed {err}"
                                 )
-                                if attemp < max_retries - 1:
+                                if attempt < max_retries - 1:
                                     time.sleep(2)
                                 else:
                                     last_error = err
