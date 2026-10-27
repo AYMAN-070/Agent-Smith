@@ -183,7 +183,7 @@ def apply_network_block() -> None:
         "fromfd",
     ):
         setattr(socket, attr, blocked_func)
-    socket.socket = BlockedSocket
+    setattr(socket, "socket", BlockedSocket)
 
     try:
         import _socket
@@ -195,7 +195,7 @@ def apply_network_block() -> None:
             "getnameinfo",
         ):
             setattr(_socket, attr, blocked_func)
-        _socket.socket = BlockedSocket
+        setattr(_socket, "socket", BlockedSocket)
     except (ImportError, AttributeError):
         pass
 
@@ -212,7 +212,6 @@ def isolated_worker(
     config: SandboxConfig,
     queue: Queue[Any],
     tools: dict[str, Any] | None = None,
-    env: dict[str, Any] | None = None,
 ) -> None:
     """Execute code in a separate process and send its result through the queue."""
     output = io.StringIO()
@@ -221,7 +220,6 @@ def isolated_worker(
     try:
         apply_system_limits(config)
         safe_env = create_safe_environment(config, tools)
-        safe_env.update(env or {})
 
         sys.stdout = output
         exec(code, safe_env)
@@ -298,27 +296,19 @@ class SandboxExecutor:
             self.mcp_client.stop()
             self.mcp_client = None
 
-    def register_custom_module(self, name: str, module_or_tools: Any) -> None:
-        """Register one tool or a dictionary of tools."""
-        if isinstance(module_or_tools, dict):
-            self.tool_wrappers.update(module_or_tools)
-        else:
-            self.tool_wrappers[name] = module_or_tools
-
     def execute(
         self,
         code: str,
-        custom_modules: dict[str, Any] | None = None,
-        env: dict[str, Any] | None = None,
+        tools: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute code in a worker process and return its result."""
         # MCP wrappers and caller-provided tools are available in the worker.
-        tools = {**self.tool_wrappers, **(custom_modules or {})}
+        merged_tools = {**self.tool_wrappers, **(tools or {})}
         result_queue: Queue[Any] = multiprocessing.Queue()
 
         process = multiprocessing.Process(
             target=isolated_worker,
-            args=(code, self.config, result_queue, tools, env),
+            args=(code, self.config, result_queue, merged_tools),
         )
         process.start()
         process.join(timeout=self.config.max_execution_time_seconds)

@@ -10,6 +10,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _get_api_keys(*patterns: str) -> list[str]:
+    """Extract valid non-empty API keys from environment matching given patterns."""
+    return [
+        val.strip()
+        for key, val in os.environ.items()
+        if val.strip() and any(pat.upper() in key.upper() for pat in patterns)
+    ]
+
+
 class Provider:
     """Dispatches chat completion requests across multiple LLM providers."""
 
@@ -17,29 +26,62 @@ class Provider:
         self, model: str | None = None, provider: str | None = None
     ) -> None:
         """Initialize provider configurations and API keys from environment."""
-        gemini_keys = [
-            val
-            for key, val in os.environ.items()
-            if key.startswith("GEMINI_API")
-        ]
-        openai_keys = [
-            val for key, val in os.environ.items() if key.startswith("OPEN")
-        ]
+        gemini_keys = _get_api_keys("GEMINI", "GOOGLE")
+        openai_keys = _get_api_keys("OPENAI", "OPEN_AI")
+        openrouter_keys = _get_api_keys("OPENROUTER", "OPEN_ROUTER")
+        nvidia_keys = _get_api_keys("NVIDIA")
+        groq_keys = _get_api_keys("GROQ", "GROK")
 
-        nvidia_keys = [
-            val
-            for key, val in os.environ.items()
-            if key.startswith("NVIDIA_API")
-        ]
+        if model or provider:
+            target_url = provider or ""
+            target_model = model or ""
 
-        if model and provider:
-            keys = gemini_keys or openai_keys or nvidia_keys
-            self.provider = [
+            if not target_url:
+                if target_model.startswith("gemini"):
+                    target_url = (
+                        "https://generativelanguage.googleapis.com/v1beta/openai"
+                    )
+                elif (
+                    target_model.startswith("nvidia/")
+                    or "nemotron" in target_model
+                ):
+                    target_url = "https://integrate.api.nvidia.com/v1"
+                elif "/" in target_model:
+                    target_url = "https://openrouter.ai/api/v1"
+                else:
+                    target_url = "https://api.openai.com/v1"
+
+            url_lower = target_url.lower()
+            if "openrouter" in url_lower:
+                keys = openrouter_keys or openai_keys
+            elif "openai" in url_lower:
+                keys = openai_keys
+            elif "googleapis" in url_lower or "gemini" in url_lower:
+                keys = gemini_keys
+            elif "nvidia" in url_lower:
+                keys = nvidia_keys
+            elif "groq" in url_lower:
+                keys = groq_keys
+            else:
+                generic_key = os.environ.get("LLM_API_KEY")
+                keys = (
+                    [generic_key]
+                    if generic_key
+                    else (
+                        openai_keys
+                        or gemini_keys
+                        or openrouter_keys
+                        or nvidia_keys
+                        or groq_keys
+                    )
+                )
+
+            self.provider: list[dict[str, Any]] = [
                 {
                     "name": "Custom",
-                    "base_url": provider,
+                    "base_url": target_url.rstrip("/"),
                     "api_keys": keys,
-                    "models": [model],
+                    "models": [target_model] if target_model else ["default"],
                 }
             ]
         else:
@@ -66,7 +108,7 @@ class Provider:
                 {
                     "name": "OpenRouter",
                     "base_url": "https://openrouter.ai/api/v1",
-                    "api_keys": openai_keys,
+                    "api_keys": openrouter_keys or openai_keys,
                     "models": [
                         "openai/gpt-4o",
                         "meta-llama/llama-3.3-70b-instruct",
@@ -96,6 +138,12 @@ class Provider:
                             "Authorization": f"Bearer {key}",
                             "Content-Type": "application/json",
                         }
+                        if "openrouter" in provider["base_url"]:
+                            headers["HTTP-Referer"] = (
+                                "https://github.com/agent-smith"
+                            )
+                            headers["X-Title"] = "Agent-Smith"
+
                         payload["model"] = model
                         for attempt in range(max_retries):
                             try:
@@ -103,7 +151,7 @@ class Provider:
                                     endpoint,
                                     json=payload,
                                     headers=headers,
-                                    timeout=30,
+                                    timeout=60,
                                 )
                                 if response.status_code == 429:
                                     retries += 1
@@ -112,8 +160,21 @@ class Provider:
                                         f" '{model}'. Skipping to next candidate..."
                                     )
                                     break
+                                if response.status_code in (
+                                    400,
+                                    401,
+                                    403,
+                                    404,
+                                ):
+                                    retries += 1
+                                    print(
+                                        f"⚠️ Client error ({response.status_code})"
+                                        f" for [{provider['name']}] | Model: {model}."
+                                        " Skipping..."
+                                    )
+                                    break
                                 response.raise_for_status()
-                                data = response.json()
+                                data: dict[str, Any] = response.json()
                                 if "error" in data:
                                     print(
                                         f"⚠️ API Error: {data['error'].get('message')}"
