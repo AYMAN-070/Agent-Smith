@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from src.agent.prompt import PromptBuilder, SWEPromptBuilder
+from src.agent.SandboxOutputHandler import SandboxOutputHandler
 from src.llm.llm import LlmRequest, LlmResponse
 from src.models import (
     MBPPTaskInput,
@@ -116,7 +117,10 @@ class MBPPAgentLoop:
 
             # 2. Code ran successfully (e.g., agent printed test results)
             elif status == "success":
-                observation = sand_answer.get("output", "").strip()
+                raw_observation = sand_answer.get("output", "").strip()
+                observation = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_observation
+                )
                 print("\n👁️  [Observation Output]:")
                 print(observation if observation else "(No stdout output)")
 
@@ -130,6 +134,23 @@ class MBPPAgentLoop:
                         "Or call final_answer(solution_code)"
                         " if you are sure it works."
                     )
+                elif SandboxOutputHandler.is_test_run_finished(
+                    code_for_sandbox,
+                    observation,
+                    has_patch=True,
+                    benchmark="mbpp",
+                ):
+                    print(
+                        "🎯 MBPP tests passed! Forcing agent to submit "
+                        "final_answer."
+                    )
+                    feedback = (
+                        f"{observation}\n\n"
+                        "[CRITICAL NOTICE: ALL TESTS PASSED!]\n"
+                        "All assertions passed. You are done!\n"
+                        "Submit your final solution immediately: "
+                        "final_answer(solution_code)"
+                    )
                 else:
                     feedback = observation
 
@@ -142,9 +163,12 @@ class MBPPAgentLoop:
 
             # 3. Execution error or timeout
             else:
-                error_trace = (
+                raw_error = (
                     sand_answer.get("error")
                     or "Execution failed without details."
+                )
+                error_trace = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_error
                 )
                 print("\n" + "!" * 50)
                 print(
@@ -357,11 +381,33 @@ class SWEAgentLoop:
 
             # 2. Code ran successfully (Agent used tools and printed results)
             elif status == "success":
-                observation = sand_answer.get("output", "").strip()
+                raw_observation = sand_answer.get("output", "").strip()
+                observation = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_observation
+                )
                 print("\n👁️  [Observation Output]:")
                 print(observation if observation else "(No stdout output)")
 
-                if not observation:
+                has_patch = False
+                if "run_tests" in code_for_sandbox:
+                    patch_res = self.sandbox.execute("print(get_patch())")
+                    has_patch = bool(patch_res.get("output", "").strip())
+
+                if SandboxOutputHandler.is_test_run_finished(
+                    code_for_sandbox,
+                    observation,
+                    has_patch=has_patch,
+                    benchmark="swebench",
+                ):
+                    print(
+                        "🎯 Tests passed! Forcing agent to submit final_answer."
+                    )
+                    feedback = (
+                        SandboxOutputHandler.build_test_success_feedback(
+                            observation
+                        )
+                    )
+                elif not observation:
                     feedback = (
                         "Code executed successfully with no printed output.\n"
                         "Remember to print() tool results, or verify changes "
@@ -379,8 +425,11 @@ class SWEAgentLoop:
 
             # 3. Execution error in the agent's script
             else:
-                error_trace = (
+                raw_error = (
                     sand_answer.get("error") or "Unknown execution error."
+                )
+                error_trace = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_error
                 )
                 print("\n" + "!" * 50)
                 print(

@@ -76,10 +76,10 @@ def generate_tools_manual(
         "",
     ]
 
-    for tool in resolved_tools:
+    for idx, tool in enumerate(resolved_tools, 1):
         sig = format_tool_signature(tool)
         desc = tool.get("description", "No description provided.")
-        lines.append(f"1. `{sig}`")
+        lines.append(f"{idx}. `{sig}`")
         lines.append(f"   {desc}")
 
         props = tool.get("inputSchema", {}).get("properties", {})
