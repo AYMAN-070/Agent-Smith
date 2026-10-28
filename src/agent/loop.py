@@ -292,6 +292,7 @@ class SWEAgentLoop:
         steps_metric: list[StepMetrics] = []
         max_loop = 30
         current_loop = 0
+        tests_passed = False
         print("\n" + "=" * 50)
         print("🛠️ START SWE AGENT LOOP")
         print("=" * 50)
@@ -388,6 +389,9 @@ class SWEAgentLoop:
                 print("\n👁️  [Observation Output]:")
                 print(observation if observation else "(No stdout output)")
 
+                if "edit_file" in code_for_sandbox:
+                    tests_passed = False
+
                 has_patch = False
                 if "run_tests" in code_for_sandbox:
                     patch_res = self.sandbox.execute("print(get_patch())")
@@ -399,11 +403,23 @@ class SWEAgentLoop:
                     has_patch=has_patch,
                     benchmark="swebench",
                 ):
+                    tests_passed = True
                     print(
-                        "🎯 Tests passed! Forcing agent to submit final_answer."
+                        "🎯 Tests passed! Forcing agent to inspect and submit."
                     )
                     feedback = (
                         SandboxOutputHandler.build_test_success_feedback(
+                            observation
+                        )
+                    )
+                elif tests_passed and "get_patch" in code_for_sandbox and (
+                    "diff --git" in observation or "--- a/" in observation
+                ):
+                    print(
+                        "🎯 Patch confirmed after tests! Forcing final_answer."
+                    )
+                    feedback = (
+                        SandboxOutputHandler.build_patch_confirmed_feedback(
                             observation
                         )
                     )

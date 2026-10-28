@@ -76,8 +76,15 @@ def debug_swebench_issue(issue_description: str) -> str:
 # File System Tools
 @mcp.tool()
 def read_file(filepath: str, start_line: int, end_line: int) -> str:
-    """Read the content of a file with line numbers.
-    The output format must be similar to cat -n:"""
+    """Read a file range with 1-indexed line numbers.
+
+    Parameters:
+      - filepath: Relative path from repository root.
+      - start_line: First line to read (1-indexed).
+      - end_line: Last line to read (inclusive).
+    Note: Line numbers in output are for reading only.
+    Do NOT include line numbers when editing with edit_file.
+    """
     if CONTAINER_ID:
         target_path = Path(filepath)
         if not target_path.is_absolute():
@@ -120,7 +127,14 @@ def read_file(filepath: str, start_line: int, end_line: int) -> str:
 
 @mcp.tool()
 def edit_file(filepath: str, old_str: str, new_str: str) -> str:
-    """Replace an exact string in a file with a new string."""
+    """Replace an exact unique code block in a file with new code.
+
+    Parameters:
+      - filepath: Relative path from repository root.
+      - old_str: Exact matching string to replace. Must preserve exact
+        whitespace and indentation, without line numbers.
+      - new_str: New replacement string to insert.
+    """
     if CONTAINER_ID:
         target_path = Path(filepath)
         if not target_path.is_absolute():
@@ -170,7 +184,12 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
 
 @mcp.tool()
 def list_files(directory: str = ".", pattern: str = "*") -> str:
-    """List files in a directory matching a given pattern."""
+    """List files in a directory matching a glob pattern.
+
+    Parameters:
+      - directory: Directory to inspect (defaults to repository root '.').
+      - pattern: Glob pattern to filter files (e.g. '*.py', '*merge*').
+    """
     if not pattern:
         pattern = "*"
 
@@ -232,7 +251,12 @@ else:
 # Code Search Tools
 @mcp.tool()
 def search_code(pattern: str, file_pattern: str = "*") -> str:
-    """Perform a grep-like search in the codebase."""
+    """Search for a regex pattern across files in the codebase.
+
+    Parameters:
+      - pattern: Regular expression pattern to search for.
+      - file_pattern: Glob filter for filenames (e.g. '*.py'). Defaults to '*'.
+    """
     if not file_pattern:
         file_pattern = "*"
 
@@ -307,16 +331,24 @@ else:
 
 @mcp.tool()
 def search_function_or_class_definition_in_code(name: str) -> str:
-    """Find the definition of a function or a class.
-    The output format must be similar to search_code format."""
+    """Find the definition of a function or class across the codebase.
+
+    Parameters:
+      - name: Exact function or class name to locate.
+    """
     pattern = rf"^\s*(?:async\s+def|def|class)\s+{re.escape(name)}\b"
     return search_code(pattern=pattern, file_pattern="*.py")
 
 
 @mcp.tool()
 def find_references(name: str, filepath: str, line: int) -> str:
-    """Find all usages of a symbol (function or class).
-    The output format must be similar to search_code format."""
+    """Find all usages and references of a symbol across Python files.
+
+    Parameters:
+      - name: Symbol name (function, class, variable).
+      - filepath: Path of the file where the symbol is defined.
+      - line: Line number of the definition.
+    """
     pattern = rf"\b{re.escape(name)}\b"
 
     if CONTAINER_ID:
@@ -419,7 +451,12 @@ else:
 # Execution Tools
 @mcp.tool()
 def run_tests() -> str:
-    """Execute the evaluation script."""
+    """Execute the repository test suite in the Docker testbed environment.
+
+    Runs the official pytest evaluation. Returns test results, summary,
+    and exit code (0 when all tests pass). Use this as the primary tool
+    to verify bug fixes.
+    """
     if CONTAINER_ID:
         try:
             res = _docker_exec(
@@ -462,8 +499,10 @@ def run_tests() -> str:
 
 @mcp.tool()
 def get_patch() -> str:
-    """Retrieve the unified git diff of all
-    changes made to the repository, depending on the implementation."""
+    """Retrieve the unified git diff of all modifications made to the repo.
+
+    Use this to inspect your changes before calling final_answer(get_patch()).
+    """
     if CONTAINER_ID:
         try:
             res = _docker_exec(
@@ -508,15 +547,33 @@ def get_patch() -> str:
 
 @mcp.tool()
 def run_command(command: str, workdir: str = "") -> str:
-    """Execute a shell command in the specified working directory.
-    Returns the command’s stdout, stderr, and exit code."""
+    """Execute a shell command with the project's conda environment active.
+
+    Parameters:
+      - command: Shell command to execute. Do NOT use pip install.
+      - workdir: Working directory (defaults to /testbed).
+    Note: For testing the repository, prefer run_tests().
+    Returns the command's stdout, stderr, and exit code.
+    """
+    # Guard against modifying environment packages via pip
+    if "pip install" in command or "pip3 install" in command:
+        return (
+            "Error: Modifying the python environment with pip is forbidden. "
+            "Use the pre-installed testbed environment and run_tests()."
+        )
+
     if CONTAINER_ID:
         target_workdir = workdir if workdir else "/testbed"
         if not target_workdir.startswith("/"):
             target_workdir = f"/testbed/{target_workdir}"
         try:
+            # Activate conda testbed environment before executing command
+            cmd_with_env = (
+                "source /opt/miniconda3/bin/activate testbed 2>/dev/null; "
+                f"{command}"
+            )
             res = _docker_exec(
-                ["/bin/bash", "-c", command],
+                ["/bin/bash", "-c", cmd_with_env],
                 workdir=target_workdir,
                 timeout=120,
             )

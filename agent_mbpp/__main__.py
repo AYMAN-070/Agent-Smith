@@ -90,6 +90,9 @@ def main() -> None:
             provider_url=args.provider_url,
         )
         agent.run()
+    except Exception as err:
+        print(f"\n{err}", file=sys.stderr)
+        sys.exit(1)
     finally:
         sandbox.close()
 

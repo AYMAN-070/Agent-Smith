@@ -5,7 +5,7 @@
 ## 1. Setup & Methodology
 
 ### Evaluated Models & Providers
-We compared **5 language models** across **2 distinct API providers** (NVIDIA NIM, OpenRouter) on the same set of 3 SWE-bench tasks:
+We compared **7 language models** across **3 distinct API providers** (NVIDIA NIM, OpenRouter, Gemini) on the same set of 3 SWE-bench tasks:
 
 | Model Identifier | Provider | Architecture / Category | Context Window |
 | :--- | :--- | :--- | :--- |
@@ -14,6 +14,8 @@ We compared **5 language models** across **2 distinct API providers** (NVIDIA NI
 | `meta-llama/llama-3.3-70b-instruct` | OpenRouter | Open-Weights Dense Flagship | 128k |
 | `qwen/qwen-2.5-coder-32b-instruct` | OpenRouter | Specialized Code Model | 128k |
 | `mistralai/mistral-small-24b-instruct-2501` | OpenRouter | European Compact Reasoning | 32k |
+| `gemini-3.5-flash-lite` | Gemini | High-Throughput Multimodal | 1M |
+| `gemini-3.1-flash-lite` | Gemini | High-Throughput Multimodal | 1M |
 
 > **Note on Runtime Architecture**: While this benchmark focuses on the core models evaluated below across 15 runs, Agent Smith's production provider cascade (`src/llm/provider.py`) also supports `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, and `openai/gpt-4o` as fallback candidates.
 
@@ -45,6 +47,10 @@ Tasks were drawn from the official 42 `SEED_POOL` SWE-bench tasks to guarantee t
 | `mistralai/mistral-small-24b-instruct-2501` | OpenRouter | `pydata__xarray-4629` | ✅ PASS | 8 | 32,184 | 149 | 13.97s |
 | `mistralai/mistral-small-24b-instruct-2501` | OpenRouter | `django__django-11066` | ❌ FAIL | 30 | 111,351 | 789 | 75.63s |
 | `mistralai/mistral-small-24b-instruct-2501` | OpenRouter | `sympy__sympy-13480` | ✅ PASS | 12 | 23,103 | 274 | 40.72s |
+| `gemini-3.5-flash-lite` | Gemini | `pydata__xarray-4629` | ✅ PASS | 7 | 44,120 | 181 | 98.0s |
+| `gemini-3.5-flash-lite` | Gemini | `django__django-11066` | ✅ PASS | 8 | 24,337 | 213 | 158.11s |
+| `gemini-3.5-flash-lite` | Gemini | `sympy__sympy-13480` | ✅ PASS | 12 | 56,843 | 309 | 361.12s |
+| `gemini-3.1-flash-lite` | Gemini | `django__django-11066` | ✅ PASS | 8 | 21,831 | 713 | 279.77s |
 
 ## 3. Provider Reliability & Operational Stability
 
@@ -55,6 +61,8 @@ Tasks were drawn from the official 42 `SEED_POOL` SWE-bench tasks to guarantee t
 | `meta-llama/llama-3.3-70b-instruct` (OpenRouter) | 4.41s | 0 | 100.0% |
 | `qwen/qwen-2.5-coder-32b-instruct` (OpenRouter) | 6.25s | 0 | 100.0% |
 | `mistralai/mistral-small-24b-instruct-2501` (OpenRouter) | 1.16s | 0 | 100.0% |
+| `gemini-3.5-flash-lite` (Gemini) | 18.42s | 0 | 100.0% |
+| `gemini-3.1-flash-lite` (Gemini) | 34.78s | 13 | 74% |
 
 ## 4. Intermediary Behavioral Metrics
 
@@ -79,6 +87,10 @@ In accordance with Section V.7, we measure exploration efficiency and submission
 | `mistralai/mistral-small-24b-instruct-2501` | `pydata__xarray-4629` | Step 2 | 2 |
 | `mistralai/mistral-small-24b-instruct-2501` | `django__django-11066` | Step 3 | - |
 | `mistralai/mistral-small-24b-instruct-2501` | `sympy__sympy-13480` | Step 2 | - |
+| `gemini-3.5-flash-lite` | `pydata__xarray-4629` | Step 2 | 2 |
+| `gemini-3.5-flash-lite` | `django__django-11066` | Step 2 | - |
+| `gemini-3.5-flash-lite` | `sympy__sympy-13480` | Step 3 | - |
+| `gemini-3.1-flash-lite` | `django__django-11066` | Step 2 | - |
 
 ## 5. Ablation Study: Observation Truncation Impact
 
