@@ -1,5 +1,6 @@
 """Isolated code execution sandbox with security constraints and resource limits."""
 
+import ast
 import builtins
 import io
 import multiprocessing
@@ -207,6 +208,53 @@ def apply_system_limits(config: SandboxConfig) -> None:
     apply_network_block()
 
 
+def transform_to_interactive_code(code: str) -> Any:
+    """Transform top-level unassigned tool calls to automatically print.
+
+    Emulates an interactive REPL environment (IPython / Jupyter) so that
+    unassigned tool calls (e.g. `run_tests()`, `read_file(...)`, etc.)
+    automatically write their return value to stdout without requiring
+    the LLM to explicitly wrap them in `print()`.
+
+    Parameters
+    ----------
+    code : str
+        Raw Python source code from the model.
+
+    Returns
+    -------
+    Any
+        Compiled code object ready for exec, or original code if parsing fails.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+
+    for node in tree.body:
+        # Wrap standalone top-level function/tool calls
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            func = node.value.func
+            # Do not double-wrap if already print(...) or final_answer(...)
+            if isinstance(func, ast.Name) and func.id in (
+                "print",
+                "final_answer",
+            ):
+                continue
+
+            node.value = ast.Call(
+                func=ast.Name(id="print", ctx=ast.Load()),
+                args=[node.value],
+                keywords=[],
+            )
+
+    ast.fix_missing_locations(tree)
+    try:
+        return compile(tree, "<sandbox>", "exec")
+    except Exception:
+        return code
+
+
 def isolated_worker(
     code: str,
     config: SandboxConfig,
@@ -224,7 +272,8 @@ def isolated_worker(
         safe_env.update(env or {})
 
         sys.stdout = output
-        exec(code, safe_env)
+        executable_code = transform_to_interactive_code(code)
+        exec(executable_code, safe_env)
 
         result = {
             "status": "success",

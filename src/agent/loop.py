@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from src.agent.prompt import PromptBuilder, SWEPromptBuilder
+from src.agent.SandboxOutputHandler import SandboxOutputHandler
 from src.llm.llm import LlmRequest, LlmResponse
 from src.models import (
     MBPPTaskInput,
@@ -68,7 +69,9 @@ class MBPPAgentLoop:
                     "If you have completed the solution, call final_answer(solution_code)."
                 )
                 self.prompt.add_model_response(llm_response.llm_output)
-                self.prompt.add_error_feedback(feedback)
+                self.prompt.add_error_feedback(
+                    feedback, step=step, max_steps=max_loop
+                )
 
                 sand_answer = {
                     "status": "error",
@@ -114,7 +117,10 @@ class MBPPAgentLoop:
 
             # 2. Code ran successfully (e.g., agent printed test results)
             elif status == "success":
-                observation = sand_answer.get("output", "").strip()
+                raw_observation = sand_answer.get("output", "").strip()
+                observation = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_observation
+                )
                 print("\n👁️  [Observation Output]:")
                 print(observation if observation else "(No stdout output)")
 
@@ -128,23 +134,41 @@ class MBPPAgentLoop:
                         "Or call final_answer(solution_code)"
                         " if you are sure it works."
                     )
-                else:
-                    feedback = (
-                        f"Sandbox Observation (stdout):\n{observation}\n\n"
-                        "If all tests passed, call"
-                        " final_answer(your_solution_code).\n"
-                        "If tests failed, modify your"
-                        " implementation and re-test with run_tests."
+                elif SandboxOutputHandler.is_test_run_finished(
+                    code_for_sandbox,
+                    observation,
+                    has_patch=True,
+                    benchmark="mbpp",
+                ):
+                    print(
+                        "🎯 MBPP tests passed! Forcing agent to submit "
+                        "final_answer."
                     )
+                    feedback = (
+                        f"{observation}\n\n"
+                        "[CRITICAL NOTICE: ALL TESTS PASSED!]\n"
+                        "All assertions passed. You are done!\n"
+                        "Submit your final solution immediately: "
+                        "final_answer(solution_code)"
+                    )
+                else:
+                    feedback = observation
 
-                self.prompt.add_model_response(code_for_sandbox)
-                self.prompt.add_error_feedback(feedback)
+                self.prompt.add_model_response(
+                    f"```python\n{code_for_sandbox}\n```"
+                )
+                self.prompt.add_error_feedback(
+                    feedback, step=step, max_steps=max_loop
+                )
 
             # 3. Execution error or timeout
             else:
-                error_trace = (
+                raw_error = (
                     sand_answer.get("error")
                     or "Execution failed without details."
+                )
+                error_trace = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_error
                 )
                 print("\n" + "!" * 50)
                 print(
@@ -159,9 +183,13 @@ class MBPPAgentLoop:
                 )
                 print("!" * 50 + "\n")
 
-                self.prompt.add_model_response(code_for_sandbox)
+                self.prompt.add_model_response(
+                    f"```python\n{code_for_sandbox}\n```"
+                )
                 self.prompt.add_error_feedback(
-                    f"Sandbox Error:\n{error_trace}"
+                    f"Execution Error:\n{error_trace}",
+                    step=step,
+                    max_steps=max_loop,
                 )
 
             current_loop += 1
@@ -286,12 +314,15 @@ class SWEAgentLoop:
                     "⚠️  [Warning]: No code block detected. Prompting LLM to format correctly."
                 )
                 feedback = (
-                    "Error: No executable Python code block was detected in your response.\n"
-                    "You MUST wrap your Python code in ```python\n<code here>\n```.\n"
-                    "If you have completed the solution, call final_answer(solution_code)."
+                    "Error: No executable Python code block detected.\n"
+                    "Wrap your Python code in ```python\n<code here>\n```.\n"
+                    "If you have completed the fix, call "
+                    "final_answer(get_patch())."
                 )
                 self.prompt.add_model_response(llm_response.llm_output)
-                self.prompt.add_feedback(feedback)
+                self.prompt.add_feedback(
+                    feedback, step=step, max_steps=max_loop
+                )
 
                 sand_answer = {
                     "status": "error",
@@ -350,31 +381,55 @@ class SWEAgentLoop:
 
             # 2. Code ran successfully (Agent used tools and printed results)
             elif status == "success":
-                observation = sand_answer.get("output", "").strip()
+                raw_observation = sand_answer.get("output", "").strip()
+                observation = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_observation
+                )
                 print("\n👁️  [Observation Output]:")
                 print(observation if observation else "(No stdout output)")
 
-                if not observation:
+                has_patch = False
+                if "run_tests" in code_for_sandbox:
+                    patch_res = self.sandbox.execute("print(get_patch())")
+                    has_patch = bool(patch_res.get("output", "").strip())
+
+                if SandboxOutputHandler.is_test_run_finished(
+                    code_for_sandbox,
+                    observation,
+                    has_patch=has_patch,
+                    benchmark="swebench",
+                ):
+                    print(
+                        "🎯 Tests passed! Forcing agent to submit final_answer."
+                    )
                     feedback = (
-                        "Warning: Your code executed with no output. "
-                        "Remember to print() tool results.\n"
-                        "When done and tests pass, call "
-                        "final_answer(get_patch())."
+                        SandboxOutputHandler.build_test_success_feedback(
+                            observation
+                        )
+                    )
+                elif not observation:
+                    feedback = (
+                        "Code executed successfully with no printed output.\n"
+                        "Remember to print() tool results, or verify changes "
+                        "with print(get_patch())."
                     )
                 else:
-                    feedback = (
-                        f"Sandbox Observation (stdout):\n{observation}\n\n"
-                        "Analyze this output. Call another tool if needed, "
-                        "or call final_answer(get_patch()) if tests pass."
-                    )
+                    feedback = observation
 
-                self.prompt.add_model_response(code_for_sandbox)
-                self.prompt.add_feedback(feedback)
+                self.prompt.add_model_response(
+                    f"```python\n{code_for_sandbox}\n```"
+                )
+                self.prompt.add_feedback(
+                    feedback, step=step, max_steps=max_loop
+                )
 
             # 3. Execution error in the agent's script
             else:
-                error_trace = (
+                raw_error = (
                     sand_answer.get("error") or "Unknown execution error."
+                )
+                error_trace = SandboxOutputHandler.clean_and_truncate(
+                    code_for_sandbox, raw_error
                 )
                 print("\n" + "!" * 50)
                 print(
@@ -383,11 +438,14 @@ class SWEAgentLoop:
                 print(f"{error_trace}")
                 print("!" * 50 + "\n")
 
-                self.prompt.add_model_response(code_for_sandbox)
+                self.prompt.add_model_response(
+                    f"```python\n{code_for_sandbox}\n```"
+                )
                 self.prompt.add_feedback(
-                    f"[Iteration {step}/{max_loop}]\n"
                     f"Execution error:\n{error_trace}\n"
-                    "Fix your code and try again."
+                    "Fix your code and try again.",
+                    step=step,
+                    max_steps=max_loop,
                 )
 
             current_loop += 1

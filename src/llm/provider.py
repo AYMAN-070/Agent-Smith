@@ -103,7 +103,6 @@ class Provider:
                                     endpoint,
                                     json=payload,
                                     headers=headers,
-                                    timeout=30,
                                 )
                                 if response.status_code == 429:
                                     retries += 1
