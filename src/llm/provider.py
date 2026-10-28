@@ -45,14 +45,6 @@ class Provider:
         else:
             self.provider = [
                 {
-                    "name": "NVIDIA",
-                    "base_url": "https://integrate.api.nvidia.com/v1",
-                    "api_keys": nvidia_keys,
-                    "models": [
-                        "nvidia/nemotron-3-ultra-550b-a55b",
-                    ],
-                },
-                {
                     "name": "Gemini",
                     "base_url": (
                         "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -61,6 +53,14 @@ class Provider:
                     "models": [
                         "gemini-3.5-flash-lite",
                         "gemini-3.1-flash-lite",
+                    ],
+                },
+                {
+                    "name": "NVIDIA",
+                    "base_url": "https://integrate.api.nvidia.com/v1",
+                    "api_keys": nvidia_keys,
+                    "models": [
+                        "nvidia/nemotron-3-ultra-550b-a55b",
                     ],
                 },
                 {
