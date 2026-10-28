@@ -1,11 +1,11 @@
 """Agent execution loops for MBPP and SWE-bench tasks."""
 
 import time
-from pathlib import Path
 from typing import Any
 
+from src.agent.base_loop import BaseAgentLoop
 from src.agent.prompt import PromptBuilder, SWEPromptBuilder
-from src.agent.SandboxOutputHandler import SandboxOutputHandler
+from src.agent.sandbox_output_handler import SandboxOutputHandler
 from src.llm.llm import LlmRequest, LlmResponse
 from src.models import (
     MBPPTaskInput,
@@ -13,32 +13,42 @@ from src.models import (
     StepMetrics,
     SWEBenchTaskInput,
 )
+from src.rules import RulesMpbb, RulesSwe
 from src.sandbox.executor import SandboxExecutor
 
 
-class MBPPAgentLoop:
+class MBPPAgentLoop(BaseAgentLoop):
     """Iterative agent loop for solving MBPP programming tasks."""
+
+    benchmark = "mbpp"
+    failure_return_value = "didnt succeed"
+    failure_solution_value = "didnt succeed"
 
     def __init__(
         self,
         task: MBPPTaskInput,
         sandbox: SandboxExecutor,
+        rules: RulesMpbb,
         output_path: str = "solution.json",
         model_name: str | None = None,
         provider_url: str | None = None,
     ) -> None:
         """Initialize MBPP agent loop with task, sandbox, and optional model config."""
-        self.task = task
-        self.sandbox = sandbox
-        self.output_path = output_path
+        super().__init__(
+            task=task,
+            sandbox=sandbox,
+            rules=rules,
+            output_path=output_path,
+            model_name=model_name,
+            provider_url=provider_url,
+        )
         self.prompt = PromptBuilder(task, tools_manual=sandbox.tools)
-        self.llm_request = LlmRequest(model_name, provider_url)
 
     def run(self) -> str:
         """Execute the iterative loop to solve the MBPP task."""
         start_time = time.time()
         steps_metric: list[StepMetrics] = []
-        max_loop = 10
+        max_loop = self.rules.iterations
         current_loop = 0
         print("\n" + "=" * 50)
         print("🚀 START MBPP AGENT LOOP")
@@ -82,6 +92,11 @@ class MBPPAgentLoop:
                     self.record_step(llm_response, sand_answer, step)
                 )
                 current_loop += 1
+                limit_error = self.limit_checker(steps_metric, start_time)
+                if limit_error:
+                    return self._save_failure(
+                        steps_metric, start_time, limit_error
+                    )
                 continue
 
             print("⚙️  [2/3] Executing in Sandbox...")
@@ -104,14 +119,11 @@ class MBPPAgentLoop:
                 print(f"Final Solution:\n{solution}")
                 print("=" * 50 + "\n")
 
-                solution_output = self.build_solution_output(
+                self._save_solution(
                     status=True,
                     solution=str(solution),
                     steps=steps_metric,
                     total_time_seconds=time.time() - start_time,
-                )
-                Path(self.output_path).write_text(
-                    solution_output.model_dump_json(indent=2), encoding="utf-8"
                 )
                 return str(solution)
 
@@ -194,103 +206,53 @@ class MBPPAgentLoop:
 
             current_loop += 1
 
-        print("\n" + "=" * 50)
-        print("⚠️ FAILURE: Max iterations reached without solving the task.")
-        print("=" * 50 + "\n")
-        solution_output = self.build_solution_output(
-            status=False,
-            solution="didnt succeed",
-            steps=steps_metric,
-            total_time_seconds=time.time() - start_time,
-            error="Max iterations reached without solving the task.",
-        )
-        Path(self.output_path).write_text(
-            solution_output.model_dump_json(indent=2), encoding="utf-8"
-        )
-        return "didnt succeed"
+            limit_error = self.limit_checker(steps_metric, start_time)
+            if limit_error:
+                return self._save_failure(
+                    steps_metric, start_time, limit_error
+                )
 
-    def record_step(
-        self, llm: LlmResponse, sandbox: dict[str, Any], step: int
-    ) -> StepMetrics:
-        """Record metrics and execution output for an iteration step."""
-        raw_output = (
-            sandbox.get("output")
-            or sandbox.get("error")
-            or sandbox.get("status", "")
+        return self._save_failure(
+            steps_metric,
+            start_time,
+            error="Iteration limit reached without solving the task.",
         )
-        step_metric = StepMetrics(
-            step=step,
-            input_tokens=llm.input_tokens,
-            output_tokens=llm.output_tokens,
-            request_time_ms=llm.request_time_ms,
-            api_url=llm.url,
-            model_name=llm.model_name,
-            llm_output=llm.llm_output,
-            sandbox_input=llm.code,
-            sandbox_output=str(raw_output),
-            retries=llm.retries,
-        )
-        return step_metric
 
-    def build_solution_output(
-        self,
-        status: bool,
-        solution: str,
-        steps: list[StepMetrics],
-        total_time_seconds: float,
-        error: str | None = None,
-    ) -> SolutionOutput:
-        """Construct final SolutionOutput model from execution metrics."""
-        total_iteration = len(steps)
-        total_requests = len(steps) + sum(s.retries for s in steps)
-        total_input_tokens = sum(s.input_tokens for s in steps)
-        total_output_tokens = sum(s.output_tokens for s in steps)
-
-        solution_output = SolutionOutput(
-            task_id=str(self.task.task_id),
-            benchmark="mbpp",
-            success=status,
-            solution=solution,
-            iterations=total_iteration,
-            total_requests=total_requests,
-            total_input_tokens=total_input_tokens,
-            total_output_tokens=total_output_tokens,
-            total_time_seconds=total_time_seconds,
-            steps=steps,
-            system_prompt=self.prompt.system_instruction,
-            error=error,
-        )
-        return solution_output
-
-
-class SWEAgentLoop:
+class SWEAgentLoop(BaseAgentLoop):
     """Iterative agent loop for solving SWE-bench software engineering tasks."""
+
+    benchmark = "swebench"
+    failure_return_value = "FAILED"
+    failure_solution_value = ""
 
     def __init__(
         self,
         task: SWEBenchTaskInput,
         sandbox: SandboxExecutor,
+        rules: RulesSwe,
         output_path: str = "solution.json",
         model_name: str | None = None,
         provider_url: str | None = None,
     ) -> None:
-        """
-        Initializes the loop for the Software Engineering Agent.
-        """
-        self.task = task
-        self.sandbox = sandbox
-        self.output_path = output_path
+        """Initializes the loop for the Software Engineering Agent."""
+        super().__init__(
+            task=task,
+            sandbox=sandbox,
+            rules=rules,
+            output_path=output_path,
+            model_name=model_name,
+            provider_url=provider_url,
+        )
         self.issue_description = task.problem_statement
         self.prompt = SWEPromptBuilder(
             self.issue_description, tools_manual=sandbox.tools
         )
-        self.llm_request = LlmRequest(model_name, provider_url)
 
     def run(self) -> str:
         """Execute the iterative loop to resolve the SWE-bench issue."""
         start_time = time.time()
         steps_metric: list[StepMetrics] = []
-        max_loop = 30
+        max_loop = self.rules.iterations
         current_loop = 0
         tests_passed = False
         print("\n" + "=" * 50)
@@ -334,6 +296,11 @@ class SWEAgentLoop:
                     self.record_step(llm_response, sand_answer, step)
                 )
                 current_loop += 1
+                limit_error = self.limit_checker(steps_metric, start_time)
+                if limit_error:
+                    return self._save_failure(
+                        steps_metric, start_time, limit_error
+                    )
                 continue
 
             print("⚙️  [2/3] Executing in Sandbox...")
@@ -369,14 +336,11 @@ class SWEAgentLoop:
                         if any(m in candidate_patch for m in patch_markers):
                             solution = candidate_patch
 
-                solution_output = self.build_solution_output(
+                self._save_solution(
                     status=True,
                     solution=str(solution),
                     steps=steps_metric,
                     total_time_seconds=time.time() - start_time,
-                )
-                Path(self.output_path).write_text(
-                    solution_output.model_dump_json(indent=2), encoding="utf-8"
                 )
                 return str(solution)
 
@@ -412,8 +376,12 @@ class SWEAgentLoop:
                             observation
                         )
                     )
-                elif tests_passed and "get_patch" in code_for_sandbox and (
-                    "diff --git" in observation or "--- a/" in observation
+                elif (
+                    tests_passed
+                    and "get_patch" in code_for_sandbox
+                    and (
+                        "diff --git" in observation or "--- a/" in observation
+                    )
                 ):
                     print(
                         "🎯 Patch confirmed after tests! Forcing final_answer."
@@ -466,70 +434,14 @@ class SWEAgentLoop:
 
             current_loop += 1
 
-        print("\n" + "=" * 50)
-        print("⚠️ FAILURE: Max iterations reached without solving the task.")
-        print("=" * 50 + "\n")
-        solution_output = self.build_solution_output(
-            status=False,
-            solution="",
-            steps=steps_metric,
-            total_time_seconds=time.time() - start_time,
-            error="Max iterations reached without solving the task.",
-        )
-        Path(self.output_path).write_text(
-            solution_output.model_dump_json(indent=2), encoding="utf-8"
-        )
-        return "FAILED"
+            limit_error = self.limit_checker(steps_metric, start_time)
+            if limit_error:
+                return self._save_failure(
+                    steps_metric, start_time, limit_error
+                )
 
-    def record_step(
-        self, llm: LlmResponse, sandbox: dict[str, Any], step: int
-    ) -> StepMetrics:
-        """Record metrics and execution output for an iteration step."""
-        raw_output = (
-            sandbox.get("output")
-            or sandbox.get("error")
-            or sandbox.get("status", "")
+        return self._save_failure(
+            steps_metric,
+            start_time,
+            error="Iteration limit reached without solving the task.",
         )
-        step_metric = StepMetrics(
-            step=step,
-            input_tokens=llm.input_tokens,
-            output_tokens=llm.output_tokens,
-            request_time_ms=llm.request_time_ms,
-            api_url=llm.url,
-            model_name=llm.model_name,
-            llm_output=llm.llm_output,
-            sandbox_input=llm.code,
-            sandbox_output=str(raw_output),
-            retries=llm.retries,
-        )
-        return step_metric
-
-    def build_solution_output(
-        self,
-        status: bool,
-        solution: str,
-        steps: list[StepMetrics],
-        total_time_seconds: float,
-        error: str | None = None,
-    ) -> SolutionOutput:
-        """Construct final SolutionOutput model from execution metrics."""
-        total_iteration = len(steps)
-        total_requests = len(steps) + sum(s.retries for s in steps)
-        total_input_tokens = sum(s.input_tokens for s in steps)
-        total_output_tokens = sum(s.output_tokens for s in steps)
-
-        solution_output = SolutionOutput(
-            task_id=str(self.task.instance_id),
-            benchmark="swebench",
-            success=status,
-            solution=solution,
-            iterations=total_iteration,
-            total_requests=total_requests,
-            total_input_tokens=total_input_tokens,
-            total_output_tokens=total_output_tokens,
-            total_time_seconds=total_time_seconds,
-            steps=steps,
-            system_prompt=self.prompt.system_instruction,
-            error=error,
-        )
-        return solution_output

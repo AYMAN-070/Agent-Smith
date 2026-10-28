@@ -13,6 +13,7 @@ from src.agent.loop import SWEAgentLoop
 from src.docker_handler import DockerContainer
 from src.models import SWEBenchTaskInput
 from src.sandbox.executor import SandboxExecutor
+from src.rules import RulesSwe
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -64,6 +65,7 @@ def main() -> None:
     task = SWEBenchTaskInput.model_validate_json(task_content)
     docker_container = DockerContainer(task.docker_image)
     sandbox = SandboxExecutor()
+    rules = RulesSwe()
     atexit.register(docker_container.stop_and_remove)
 
     def clean_exit(signum: int, frame: Any) -> None:
@@ -99,6 +101,7 @@ def main() -> None:
             output_path=args.output,
             model_name=args.model_name,
             provider_url=args.provider_url,
+            rules=rules,
         )
         agent.run()
     except Exception as err:
