@@ -3,7 +3,6 @@
 import argparse
 import json
 import sys
-from typing import Any
 
 from src.models import SandboxConfig
 from src.sandbox.executor import SandboxExecutor
@@ -52,16 +51,12 @@ def load_config(config_path: str | None) -> SandboxConfig:
     return SandboxConfig()
 
 
-def run_interactive_repl(
-    executor: SandboxExecutor,
-    custom_modules: dict[str, Any] | None = None,
-) -> None:
+def run_interactive_repl(executor: SandboxExecutor) -> None:
     """Runs the Read-Eval-Print Loop (REPL) for the sandbox in an isolated worker process."""
 
     print("=== Agent Smith Interactive Sandbox ===")
     print("Type 'exit' or use Ctrl+D to quit.")
 
-    persistent_env: dict[str, Any] = {}
     code_preamble: list[str] = []
 
     while True:
@@ -80,11 +75,7 @@ def run_interactive_repl(
                 else user_code
             )
 
-            result = executor.execute(
-                full_code,
-                custom_modules=custom_modules,
-                env=persistent_env,
-            )
+            result = executor.execute(full_code)
 
             status = result.get("status")
             if status == "final_answer":
@@ -95,10 +86,6 @@ def run_interactive_repl(
                 out = result.get("output", "")
                 if out:
                     print(out, end="" if out.endswith("\n") else "\n")
-
-                # If execution succeeded, persist returned variables
-                if "env" in result:
-                    persistent_env.update(result["env"])
 
                 # If user defined a function or class, retain in preamble
                 stripped = user_code.strip()
