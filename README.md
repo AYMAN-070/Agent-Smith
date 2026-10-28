@@ -276,7 +276,7 @@ All tools execute directly against the testbed repository inside the Docker cont
 
 # Benchmark Results and Analysis
 
-In compliance with **Section V.7 (Model Benchmark Report)** of the 42 curriculum, we evaluated **8 language models** across **3 providers** on **3 official SWE-bench tasks**:
+In compliance with **Section V.7 (Model Benchmark Report)** of the 42 curriculum, we evaluated **8 language models** across **3 providers** on **5 official SWE-bench tasks**:
 
 ### Tested Models & Providers
 1. **NVIDIA NIM**: `nvidia/nemotron-3-ultra-550b-a55b`
@@ -292,6 +292,8 @@ In compliance with **Section V.7 (Model Benchmark Report)** of the 42 curriculum
 - `pydata__xarray-4629` (`pydata/xarray`): Attribute copying bug during dataset merge.
 - `django__django-11066` (`django/django`): ContentTypes migration rename handling.
 - `sympy__sympy-13480` (`sympy/sympy`): NameError typo in symbolic hyperbolic substitution.
+- `scikit-learn__scikit-learn-13439` (`scikit-learn/scikit-learn`): Pipeline slicing special method protocol (`__len__`).
+- `sympy__sympy-18189` (`sympy/sympy`): Diophantine equation solver permutation symmetry.
 
 ### Executive Summary
 | Metric | Leader | Key Takeaway |

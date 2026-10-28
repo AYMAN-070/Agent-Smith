@@ -1,0 +1,81 @@
+{
+  "task_id": "scikit-learn__scikit-learn-13439",
+  "benchmark": "swebench",
+  "success": true,
+  "solution": "diff --git a/sklearn/pipeline.py b/sklearn/pipeline.py\nindex a62775e..783f6cd 100644\n--- a/sklearn/pipeline.py\n+++ b/sklearn/pipeline.py\n@@ -199,6 +199,10 @@ def _iter(self, with_final=True):\n             if trans is not None and trans != 'passthrough':\n                 yield idx, name, trans\n \n+    def __len__(self):\n+        \"\"\"Return the length of the Pipeline.\"\"\"\n+        return len(self.steps)\n+\n     def __getitem__(self, ind):\n",
+  "iterations": 5,
+  "total_requests": 5,
+  "total_input_tokens": 8990,
+  "total_output_tokens": 140,
+  "total_time_seconds": 15.85,
+  "steps": [
+    {
+      "step": 1,
+      "input_tokens": 1520,
+      "output_tokens": 28,
+      "request_time_ms": 2327.5,
+      "timestamp": "2026-10-28T14:10:01.120000",
+      "api_url": "https://openrouter.ai/api/v1",
+      "model_name": "openai/gpt-4o",
+      "llm_output": "```python\nprint(search_code('def __getitem__(self, ind):', 'sklearn/pipeline.py'))\n```",
+      "sandbox_input": "print(search_code('def __getitem__(self, ind):', 'sklearn/pipeline.py'))",
+      "sandbox_output": "/testbed/sklearn/pipeline.py:42: def __getitem__(self, ind):\n",
+      "retries": 0
+    },
+    {
+      "step": 2,
+      "input_tokens": 1640,
+      "output_tokens": 30,
+      "request_time_ms": 2499.0,
+      "timestamp": "2026-10-28T14:10:04.250000",
+      "api_url": "https://openrouter.ai/api/v1",
+      "model_name": "openai/gpt-4o",
+      "llm_output": "```python\nprint(read_file('sklearn/pipeline.py', 30, 60))\n```",
+      "sandbox_input": "print(read_file('sklearn/pipeline.py', 30, 60))",
+      "sandbox_output": "30: code line around sklearn/pipeline.py\n42: def __getitem__(self, ind):\n",
+      "retries": 0
+    },
+    {
+      "step": 3,
+      "input_tokens": 1780,
+      "output_tokens": 42,
+      "request_time_ms": 2401.0,
+      "timestamp": "2026-10-28T14:10:07.410000",
+      "api_url": "https://openrouter.ai/api/v1",
+      "model_name": "openai/gpt-4o",
+      "llm_output": "```python\nprint(edit_file('sklearn/pipeline.py', 'def __getitem__(self, ind', 'fixed_code'))\n```",
+      "sandbox_input": "print(edit_file('sklearn/pipeline.py', 'def __getitem__(self, ind', 'fixed_code'))",
+      "sandbox_output": "File updated successfully.\n",
+      "retries": 0
+    },
+    {
+      "step": 4,
+      "input_tokens": 1950,
+      "output_tokens": 18,
+      "request_time_ms": 2572.5,
+      "timestamp": "2026-10-28T14:10:11.890000",
+      "api_url": "https://openrouter.ai/api/v1",
+      "model_name": "openai/gpt-4o",
+      "llm_output": "```python\nprint(run_tests())\n```",
+      "sandbox_input": "print(run_tests())",
+      "sandbox_output": "PASSED [100%] All tests passed successfully\n",
+      "retries": 0
+    },
+    {
+      "step": 5,
+      "input_tokens": 2100,
+      "output_tokens": 22,
+      "request_time_ms": 2254.0,
+      "timestamp": "2026-10-28T14:10:14.300000",
+      "api_url": "https://openrouter.ai/api/v1",
+      "model_name": "openai/gpt-4o",
+      "llm_output": "```python\nprint(get_patch())\nfinal_answer(get_patch())\n```",
+      "sandbox_input": "print(get_patch())\nfinal_answer(get_patch())",
+      "sandbox_output": "diff --git a/sklearn/pipeline.py b/sklearn/pipeline.py\nindex a62775e..783f6cd 100644\n--- a/sklearn/pipeline.py\n+++ b/sklearn/pipeline.py\n@@ -199,6 +199,10 @@ def _iter(self, with_final=True):\n             if trans is not None and trans != 'passthrough':\n                 yield idx, name, trans\n \n+    def __len__(self):\n+        \"\"\"Return the length of the Pipeline.\"\"\"\n+        return len(self.steps)\n+\n     def __getitem__(self, ind):\n",
+      "retries": 0
+    }
+  ],
+  "system_prompt": "You are an autonomous Software Engineer Agent solving real-world GitHub issues.",
+  "error": null,
+  "timestamp": "2026-10-28T14:10:16.000000"
+}

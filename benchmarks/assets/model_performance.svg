@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 450" width="100%" height="auto">
+  <rect width="850" height="450" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="30" y="38" font-family="sans-serif" font-size="18" font-weight="700" fill="#0f172a">Model Solve Rate &amp; Latency Spectrum</text>
+  <text x="30" y="58" font-family="sans-serif" font-size="12" fill="#64748b">Comparison across all 8 evaluated LLMs on 5 verified SWE-bench tasks (40 runs)</text>
+  <rect x="30" y="75" width="790" height="30" fill="#f8fafc" rx="6"/>
+  <text x="45" y="95" font-family="sans-serif" font-size="11" font-weight="700" fill="#475569">MODEL IDENTIFIER</text>
+  <text x="280" y="95" font-family="sans-serif" font-size="11" font-weight="700" fill="#475569">PROVIDER</text>
+  <text x="410" y="95" font-family="sans-serif" font-size="11" font-weight="700" fill="#475569">SOLVE RATE (BAR)</text>
+  <text x="620" y="95" font-family="sans-serif" font-size="11" font-weight="700" fill="#475569">AVG LATENCY</text>
+  <text x="740" y="95" font-family="sans-serif" font-size="11" font-weight="700" fill="#475569">AVG COST</text>
+  <line x1="30" y1="143" x2="820" y2="143" stroke="#f1f5f9"/>
+  <text x="45" y="125" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">gemini-3.1-flash-lite</text>
+  <text x="280" y="125" font-family="sans-serif" font-size="11" fill="#64748b">Gemini</text>
+  <rect x="410" y="114" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="114" width="140.0" height="14" rx="4" fill="#10b981"/>
+  <text x="560" y="125" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">100%</text>
+  <text x="620" y="125" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">8.08s</text>
+  <text x="740" y="125" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0022</text>
+  <line x1="30" y1="181" x2="820" y2="181" stroke="#f1f5f9"/>
+  <text x="45" y="163" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">gemini-3.5-flash-lite</text>
+  <text x="280" y="163" font-family="sans-serif" font-size="11" fill="#64748b">Gemini</text>
+  <rect x="410" y="152" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="152" width="140.0" height="14" rx="4" fill="#10b981"/>
+  <text x="560" y="163" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">100%</text>
+  <text x="620" y="163" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">11.58s</text>
+  <text x="740" y="163" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0021</text>
+  <line x1="30" y1="219" x2="820" y2="219" stroke="#f1f5f9"/>
+  <text x="45" y="201" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">openai/gpt-4o-mini</text>
+  <text x="280" y="201" font-family="sans-serif" font-size="11" fill="#64748b">OpenRouter</text>
+  <rect x="410" y="190" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="190" width="140.0" height="14" rx="4" fill="#10b981"/>
+  <text x="560" y="201" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">100%</text>
+  <text x="620" y="201" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">1.01s</text>
+  <text x="740" y="201" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0032</text>
+  <line x1="30" y1="257" x2="820" y2="257" stroke="#f1f5f9"/>
+  <text x="45" y="239" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">openai/gpt-4o</text>
+  <text x="280" y="239" font-family="sans-serif" font-size="11" fill="#64748b">OpenRouter</text>
+  <rect x="410" y="228" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="228" width="140.0" height="14" rx="4" fill="#3b82f6"/>
+  <text x="560" y="239" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">100%</text>
+  <text x="620" y="239" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">2.41s</text>
+  <text x="740" y="239" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0520</text>
+  <line x1="30" y1="295" x2="820" y2="295" stroke="#f1f5f9"/>
+  <text x="45" y="277" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">meta-llama/llama-3.3-70b</text>
+  <text x="280" y="277" font-family="sans-serif" font-size="11" fill="#64748b">OpenRouter</text>
+  <rect x="410" y="266" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="266" width="140.0" height="14" rx="4" fill="#3b82f6"/>
+  <text x="560" y="277" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">100%</text>
+  <text x="620" y="277" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">4.38s</text>
+  <text x="740" y="277" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0051</text>
+  <line x1="30" y1="333" x2="820" y2="333" stroke="#f1f5f9"/>
+  <text x="45" y="315" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">nvidia/nemotron-3-ultra</text>
+  <text x="280" y="315" font-family="sans-serif" font-size="11" fill="#64748b">NVIDIA NIM</text>
+  <rect x="410" y="304" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="304" width="140.0" height="14" rx="4" fill="#8b5cf6"/>
+  <text x="560" y="315" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">100%</text>
+  <text x="620" y="315" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">4.89s</text>
+  <text x="740" y="315" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0000</text>
+  <line x1="30" y1="371" x2="820" y2="371" stroke="#f1f5f9"/>
+  <text x="45" y="353" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">qwen/qwen-2.5-coder-32b</text>
+  <text x="280" y="353" font-family="sans-serif" font-size="11" fill="#64748b">OpenRouter</text>
+  <rect x="410" y="342" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="342" width="140.0" height="14" rx="4" fill="#3b82f6"/>
+  <text x="560" y="353" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">100%</text>
+  <text x="620" y="353" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">6.09s</text>
+  <text x="740" y="353" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0028</text>
+  <line x1="30" y1="409" x2="820" y2="409" stroke="#f1f5f9"/>
+  <text x="45" y="391" font-family="monospace" font-size="11" font-weight="600" fill="#1e293b">mistral-small-24b</text>
+  <text x="280" y="391" font-family="sans-serif" font-size="11" fill="#64748b">OpenRouter</text>
+  <rect x="410" y="380" width="140" height="14" rx="4" fill="#f1f5f9"/>
+  <rect x="410" y="380" width="112.0" height="14" rx="4" fill="#f59e0b"/>
+  <text x="560" y="391" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">80%</text>
+  <text x="620" y="391" font-family="sans-serif" font-size="11" fill="#0284c7" font-weight="600">1.16s</text>
+  <text x="740" y="391" font-family="sans-serif" font-size="11" fill="#16a34a" font-weight="600">$0.0041</text>
+</svg>

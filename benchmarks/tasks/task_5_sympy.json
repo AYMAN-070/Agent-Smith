@@ -1,0 +1,9 @@
+{
+  "instance_id": "sympy__sympy-18189",
+  "problem_statement": "diophantine: incomplete results depending on syms order with permute=True\n\n```python\nIn [10]: diophantine(n**4 + m**4 - 2**4 - 3**4, syms=(m,n), permute=True)\nOut[10]: {(-3, -2), (-3, 2), (-2, -3), (-2, 3), (2, -3), (2, 3), (3, -2), (3, 2)}\n\nIn [11]: diophantine(n**4 + m**4 - 2**4 - 3**4, syms=(n,m), permute=True)\nOut[11]: {(-3, -2), (-3, 2), (2, -3), (2, 3), (3, -2), (3, 2)}\n```\n\nThe result depends on the order of variables specified in `syms` when `permute=True`. Changing the order drops valid solutions from the set.\n",
+  "docker_image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-18189:latest",
+  "eval_script": "#!/bin/bash\nset -uxo pipefail\nsource /opt/miniconda3/bin/activate\nconda activate testbed\ncd /testbed\ngit config --global --add safe.directory /testbed\npython -m pip install -e .\nbin/test sympy/solvers/tests/test_diophantine.py\n",
+  "hints_text": "diophantine permutations logic must return symmetrical solutions regardless of syms order.",
+  "repo": "sympy/sympy"
+}
+

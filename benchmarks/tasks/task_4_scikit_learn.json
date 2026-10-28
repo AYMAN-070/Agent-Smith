@@ -1,0 +1,9 @@
+{
+  "instance_id": "scikit-learn__scikit-learn-13439",
+  "problem_statement": "Pipeline should implement __len__\nWith the new indexing support added to Pipeline, pipe[:len(pipe)] raises TypeError: object of type 'Pipeline' has no len().\n\nSteps/Code to Reproduce:\n```python\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.svm import SVC\nfrom sklearn.feature_selection import SelectKBest\n\nanova_filter = SelectKBest(k=10)\nclf = SVC()\npipe = Pipeline([('anova', anova_filter), ('svc', clf)])\nlen(pipe)\n```\n\nExpected result:\n`len(pipe)` returns the number of steps in the pipeline (e.g. 2).\n",
+  "docker_image": "swebench/sweb.eval.x86_64.scikit-learn_1776_scikit-learn-13439:latest",
+  "eval_script": "#!/bin/bash\nset -uxo pipefail\nsource /opt/miniconda3/bin/activate\nconda activate testbed\ncd /testbed\ngit config --global --add safe.directory /testbed\npython -m pip install -e .\npytest sklearn/tests/test_pipeline.py -k test_pipeline_len\n",
+  "hints_text": "Implement __len__ in sklearn/pipeline.py returning len(self.steps).",
+  "repo": "scikit-learn/scikit-learn"
+}
+
