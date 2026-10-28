@@ -154,6 +154,15 @@ class MBPPAgentLoop:
                 else:
                     feedback = observation
 
+                if getattr(llm_response, "is_malformed", False):
+                    warning_note = (
+                        f"[FORMATTING NOTICE]: Code block was malformed "
+                        f"({llm_response.malformed_reason}), but was recovered "
+                        "and executed. For subsequent steps, strictly wrap Python code "
+                        "inside ```python\n<code here>\n```.\n\n"
+                    )
+                    feedback = warning_note + feedback
+
                 self.prompt.add_model_response(
                     f"```python\n{code_for_sandbox}\n```"
                 )
@@ -167,6 +176,17 @@ class MBPPAgentLoop:
                     sand_answer.get("error")
                     or "Execution failed without details."
                 )
+                if getattr(llm_response, "is_malformed", False):
+                    raw_error = (
+                        f"[FORMATTING NOTICE]: Code block was malformed "
+                        f"({llm_response.malformed_reason}), but was recovered.\n"
+                        + raw_error
+                    )
+                partial_out = sand_answer.get("output", "").strip()
+                if partial_out:
+                    raw_error += (
+                        f"\n\n[Partial stdout before interruption]:\n{partial_out}"
+                    )
                 error_trace = SandboxOutputHandler.clean_and_truncate(
                     code_for_sandbox, raw_error
                 )
@@ -432,6 +452,15 @@ class SWEAgentLoop:
                 else:
                     feedback = observation
 
+                if getattr(llm_response, "is_malformed", False):
+                    warning_note = (
+                        f"[FORMATTING NOTICE]: Code block was malformed "
+                        f"({llm_response.malformed_reason}), but was recovered "
+                        "and executed. For subsequent steps, strictly wrap Python code "
+                        "inside ```python\n<code here>\n```.\n\n"
+                    )
+                    feedback = warning_note + feedback
+
                 self.prompt.add_model_response(
                     f"```python\n{code_for_sandbox}\n```"
                 )
@@ -444,6 +473,17 @@ class SWEAgentLoop:
                 raw_error = (
                     sand_answer.get("error") or "Unknown execution error."
                 )
+                if getattr(llm_response, "is_malformed", False):
+                    raw_error = (
+                        f"[FORMATTING NOTICE]: Code block was malformed "
+                        f"({llm_response.malformed_reason}), but was recovered.\n"
+                        + raw_error
+                    )
+                partial_out = sand_answer.get("output", "").strip()
+                if partial_out:
+                    raw_error += (
+                        f"\n\n[Partial stdout before interruption]:\n{partial_out}"
+                    )
                 error_trace = SandboxOutputHandler.clean_and_truncate(
                     code_for_sandbox, raw_error
                 )

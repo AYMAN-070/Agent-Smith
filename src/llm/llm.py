@@ -19,7 +19,10 @@ class LlmResponse:
         self.retries = retries
 
         self.llm_output: str = data["choices"][0]["message"]["content"]
-        self.code: str = self.parse(self.llm_output)
+        parser = ResponseParser(self.llm_output)
+        self.code: str = parser.code
+        self.is_malformed: bool = parser.is_malformed
+        self.malformed_reason: str = parser.malformed_reason
         self.url = data["url"]
 
         usage = data.get("usage", {})
