@@ -1,6 +1,7 @@
 """CLI entry point for running the SWE-bench agent."""
 
 import argparse
+import atexit
 import os
 import shlex
 import signal
@@ -63,6 +64,7 @@ def main() -> None:
     task = SWEBenchTaskInput.model_validate_json(task_content)
     docker_container = DockerContainer(task.docker_image)
     sandbox = SandboxExecutor()
+    atexit.register(docker_container.stop_and_remove)
 
     def clean_exit(signum: int, frame: Any) -> None:
         """Handle termination signals and cleanup container and sandbox."""
@@ -73,6 +75,8 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, clean_exit)
     signal.signal(signal.SIGINT, clean_exit)
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, clean_exit)
 
     try:
         container_id = docker_container.start()

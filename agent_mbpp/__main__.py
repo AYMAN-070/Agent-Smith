@@ -1,6 +1,7 @@
 """CLI entry point for running the MBPP agent."""
 
 import argparse
+import atexit
 import shlex
 import signal
 import sys
@@ -61,6 +62,7 @@ def main() -> None:
     task = MBPPTaskInput.model_validate_json(task_content)
 
     sandbox = SandboxExecutor()
+    atexit.register(sandbox.close)
 
     def clean_exit(signum: int, frame: Any) -> None:
         """Handle termination signals and cleanup sandbox."""
@@ -70,6 +72,8 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, clean_exit)
     signal.signal(signal.SIGINT, clean_exit)
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, clean_exit)
 
     if args.mcp_server:
         sandbox.connect_mcp(server_url=args.mcp_server)
