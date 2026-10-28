@@ -31,6 +31,9 @@ class Provider:
             for key, val in os.environ.items()
             if key.startswith("NVIDIA_API")
         ]
+        groq_keys = [
+            val for key, val in os.environ.items() if key.startswith("GROQ")
+        ]
 
         if model and provider:
             keys = gemini_keys or openai_keys or nvidia_keys
@@ -71,6 +74,13 @@ class Provider:
                         "openai/gpt-4o",
                         "meta-llama/llama-3.3-70b-instruct",
                     ],
+                }
+                {
+                    "name": "Groq",
+                    "base_url": "https://api.groq.com/openai/v1",
+                    "api_keys": groq_keys,
+                    "models": ["llama-3.3-70b-versatile"],
+
                 },
             ]
 

@@ -87,7 +87,7 @@ class PromptBuilder:
                     "content": user_content,
                 },
             ],
-            "temperature": 0.2,
+            "temperature": 0.0,
             "max_tokens": 1000,
             "top_p": 0.95,
         }
