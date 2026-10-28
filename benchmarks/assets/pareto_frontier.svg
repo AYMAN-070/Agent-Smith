@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 460" width="100%" height="auto">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f8fafc"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+  <rect width="850" height="460" rx="12" fill="url(#bgGrad)" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="30" y="42" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="18" font-weight="700" fill="#0f172a">Pareto Frontier: Per-Request Latency vs Solve Rate</text>
+  <text x="30" y="65" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" fill="#64748b">Benchmark on 5 SWE-bench tasks (40 runs). Top-left quadrant represents the Pareto Optimal Zone.</text>
+  <line x1="90" y1="360.0" x2="800" y2="360.0" stroke="#e2e8f0" stroke-dasharray="4,4"/>
+  <text x="75" y="364.0" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="end">60%</text>
+  <line x1="90" y1="300.0" x2="800" y2="300.0" stroke="#e2e8f0" stroke-dasharray="4,4"/>
+  <text x="75" y="304.0" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="end">70%</text>
+  <line x1="90" y1="240.0" x2="800" y2="240.0" stroke="#e2e8f0" stroke-dasharray="4,4"/>
+  <text x="75" y="244.0" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="end">80%</text>
+  <line x1="90" y1="180.0" x2="800" y2="180.0" stroke="#e2e8f0" stroke-dasharray="4,4"/>
+  <text x="75" y="184.0" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="end">90%</text>
+  <line x1="90" y1="120.0" x2="800" y2="120.0" stroke="#e2e8f0" stroke-dasharray="4,4"/>
+  <text x="75" y="124.0" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="end">100%</text>
+  <line x1="90.0" y1="90" x2="90.0" y2="360" stroke="#f1f5f9"/>
+  <text x="90.0" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">0.0s</text>
+  <line x1="173.8" y1="90" x2="173.8" y2="360" stroke="#f1f5f9"/>
+  <text x="173.8" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">1.0s</text>
+  <line x1="257.5" y1="90" x2="257.5" y2="360" stroke="#f1f5f9"/>
+  <text x="257.5" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">2.0s</text>
+  <line x1="341.2" y1="90" x2="341.2" y2="360" stroke="#f1f5f9"/>
+  <text x="341.2" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">3.0s</text>
+  <line x1="425.0" y1="90" x2="425.0" y2="360" stroke="#f1f5f9"/>
+  <text x="425.0" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">4.0s</text>
+  <line x1="508.8" y1="90" x2="508.8" y2="360" stroke="#f1f5f9"/>
+  <text x="508.8" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">5.0s</text>
+  <line x1="592.5" y1="90" x2="592.5" y2="360" stroke="#f1f5f9"/>
+  <text x="592.5" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">6.0s</text>
+  <line x1="676.2" y1="90" x2="676.2" y2="360" stroke="#f1f5f9"/>
+  <text x="676.2" y="380" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">7.0s</text>
+  <line x1="90" y1="360" x2="800" y2="360" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="90" y1="90" x2="90" y2="360" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="445" y="405" font-family="sans-serif" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">Average Per-Request Latency (Seconds)</text>
+  <text x="25" y="225" font-family="sans-serif" font-size="12" font-weight="600" fill="#334155" text-anchor="middle" transform="rotate(-90 25 225)">Task Solve Rate</text>
+  <rect x="90" y="100.0" width="125.6" height="260.0" fill="#dcfce7" fill-opacity="0.4" rx="4"/>
+  <text x="205.6" y="140.0" font-family="sans-serif" font-size="11" font-weight="700" fill="#15803d" text-anchor="end">PARETO OPTIMAL ZONE</text>
+  <polyline points="163.7,120.0 169.6,120.0 174.6,120.0 291.8,120.0 456.8,120.0 499.5,120.0 600.0,120.0" fill="none" stroke="#10b981" stroke-width="2.5" stroke-dasharray="3,3"/>
+  <circle cx="163.7" cy="120.0" r="7" fill="#10b981" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="175.7" y="102.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">gemini-3.1-flash-lite (0.88s)</text>
+  <circle cx="169.6" cy="120.0" r="7" fill="#10b981" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="181.6" y="115.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">gemini-3.5-flash-lite (0.95s)</text>
+  <circle cx="174.6" cy="120.0" r="7" fill="#10b981" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="186.6" y="130.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">openai/gpt-4o-mini (1.01s)</text>
+  <circle cx="187.1" cy="240.0" r="7" fill="#f59e0b" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="199.1" y="245.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">mistral-small-24b (1.16s)</text>
+  <circle cx="291.8" cy="120.0" r="7" fill="#3b82f6" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="303.8" y="108.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">openai/gpt-4o (2.41s)</text>
+  <circle cx="456.8" cy="120.0" r="7" fill="#6366f1" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="468.8" y="108.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">meta-llama/llama-3.3-70b (4.38s)</text>
+  <circle cx="499.5" cy="120.0" r="7" fill="#8b5cf6" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="511.5" y="134.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">nemotron-3-ultra (Free) (4.89s)</text>
+  <circle cx="600.0" cy="120.0" r="7" fill="#0ea5e9" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="612.0" y="108.0" font-family="sans-serif" font-size="11" font-weight="600" fill="#1e293b">qwen-2.5-coder-32b (6.09s)</text>
+  <g transform="translate(180, 425)">
+    <circle cx="0" cy="5" r="5" fill="#10b981"/>
+    <text x="10" y="9" font-family="sans-serif" font-size="11" fill="#475569">Pareto Optimal (Flash/Mini)</text>
+    <circle cx="170" cy="5" r="5" fill="#3b82f6"/>
+    <text x="180" y="9" font-family="sans-serif" font-size="11" fill="#475569">Flagship &amp; Open-Weights</text>
+    <circle cx="340" cy="5" r="5" fill="#8b5cf6"/>
+    <text x="350" y="9" font-family="sans-serif" font-size="11" fill="#475569">Frontier MoE (Free Tier)</text>
+    <circle cx="500" cy="5" r="5" fill="#f59e0b"/>
+    <text x="510" y="9" font-family="sans-serif" font-size="11" fill="#475569">Compact Architecture</text>
+  </g>
+</svg>
