@@ -108,3 +108,14 @@ class SandboxOutputHandler:
             "Inspect your diff with print(get_patch()) then submit immediately "
             "using: final_answer(get_patch())"
         )
+
+    @staticmethod
+    def build_patch_confirmed_feedback(observation: str) -> str:
+        """Build urgent feedback informing the agent that diff is ready."""
+        return (
+            f"{observation}\n\n"
+            "[PATCH CONFIRMED - READY FOR SUBMISSION]\n"
+            "Your diff is verified and repository tests have already passed.\n"
+            "Do NOT run further searches, edits, or tests.\n"
+            "Submit your solution now using: final_answer(get_patch())"
+        )

@@ -42,9 +42,7 @@ class Provider:
 
             if not target_url:
                 if target_model.startswith("gemini"):
-                    target_url = (
-                        "https://generativelanguage.googleapis.com/v1beta/openai"
-                    )
+                    target_url = "https://generativelanguage.googleapis.com/v1beta/openai"
                 elif (
                     target_model.startswith("nvidia/")
                     or "nemotron" in target_model
@@ -58,10 +56,10 @@ class Provider:
             url_lower = target_url.lower()
             if "openrouter" in url_lower:
                 keys = openrouter_keys or openai_keys
-            elif "openai" in url_lower:
-                keys = openai_keys
             elif "googleapis" in url_lower or "gemini" in url_lower:
                 keys = gemini_keys
+            elif "openai" in url_lower:
+                keys = openai_keys
             elif "nvidia" in url_lower:
                 keys = nvidia_keys
             elif "groq" in url_lower:
@@ -91,14 +89,6 @@ class Provider:
         else:
             self.provider = [
                 {
-                    "name": "NVIDIA",
-                    "base_url": "https://integrate.api.nvidia.com/v1",
-                    "api_keys": nvidia_keys,
-                    "models": [
-                        "nvidia/nemotron-3-ultra-550b-a55b",
-                    ],
-                },
-                {
                     "name": "Gemini",
                     "base_url": (
                         "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -107,6 +97,14 @@ class Provider:
                     "models": [
                         "gemini-3.5-flash-lite",
                         "gemini-3.1-flash-lite",
+                    ],
+                },
+                {
+                    "name": "NVIDIA",
+                    "base_url": "https://integrate.api.nvidia.com/v1",
+                    "api_keys": nvidia_keys,
+                    "models": [
+                        "nvidia/nemotron-3-ultra-550b-a55b",
                     ],
                 },
                 {
@@ -120,6 +118,12 @@ class Provider:
                         "qwen/qwen-2.5-coder-32b-instruct",
                         "mistralai/mistral-small-24b-instruct-2501",
                     ],
+                },
+                {
+                    "name": "Groq",
+                    "base_url": "https://api.groq.com/openai/v1",
+                    "api_keys": groq_keys,
+                    "models": ["llama-3.3-70b-versatile"],
                 },
             ]
 
