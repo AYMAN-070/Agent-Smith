@@ -1,5 +1,3 @@
-"""LLM request dispatcher and response parser."""
-
 import time
 from typing import Any
 
