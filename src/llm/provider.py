@@ -5,9 +5,13 @@ import time
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
 
 
 def _get_api_keys(*patterns: str) -> list[str]:
@@ -111,7 +115,10 @@ class Provider:
                     "api_keys": openrouter_keys or openai_keys,
                     "models": [
                         "openai/gpt-4o",
+                        "openai/gpt-4o-mini",
                         "meta-llama/llama-3.3-70b-instruct",
+                        "qwen/qwen-2.5-coder-32b-instruct",
+                        "mistralai/mistral-small-24b-instruct-2501",
                     ],
                 },
             ]
@@ -151,6 +158,7 @@ class Provider:
                                     endpoint,
                                     json=payload,
                                     headers=headers,
+                                    timeout=60,
                                 )
                                 if response.status_code == 429:
                                     retries += 1
@@ -162,6 +170,7 @@ class Provider:
                                 if response.status_code in (
                                     400,
                                     401,
+                                    402,
                                     403,
                                     404,
                                 ):

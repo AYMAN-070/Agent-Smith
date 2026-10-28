@@ -11,6 +11,8 @@ help:
 	@echo "  sandbox-swe    Launch sandbox REPL with SWE-bench MCP tools"
 	@echo "  run-mbpp       Run MBPP agent (TASK_FILE=... OUTPUT_FILE=...)"
 	@echo "  run-swe        Run SWE-bench agent (TASK_FILE=... OUTPUT_FILE=...)"
+	@echo "  benchmark      Run automated multi-model SWE-bench benchmark"
+	@echo "  benchmark-report Regenerate BENCHMARK_REPORT.md from existing runs"
 	@echo "  clean          Remove Python and linter caches"
 	@echo "  fclean         Remove caches and virtual environment"
 	@echo "  re             Clean and reinstall dependencies"
@@ -37,6 +39,12 @@ run-mbpp:
 run-swe:
 	uv run python -m agent_swebench --task-file $(or $(TASK_FILE),task.json) --output $(or $(OUTPUT_FILE),solution.json)
 
+benchmark:
+	uv run python benchmarks/run_benchmark.py
+
+benchmark-report:
+	uv run python benchmarks/run_benchmark.py --report-only
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d \( -name ".mypy_cache" -o -name ".pytest_cache" -o -name ".ruff_cache" \) -exec rm -rf {} + 2>/dev/null || true
@@ -46,5 +54,5 @@ fclean: clean
 
 re: fclean install
 
-.PHONY: all help install lint sandbox sandbox-mbpp sandbox-swe run-mbpp run-swe clean fclean re
+.PHONY: all help install lint sandbox sandbox-mbpp sandbox-swe run-mbpp run-swe benchmark benchmark-report clean fclean re
 
