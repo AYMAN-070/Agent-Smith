@@ -277,6 +277,18 @@ def isolated_worker(
     else:
         sys.stdout = io.StringIO()
 
+    def get_captured_output() -> str:
+        """Retrieve captured stdout from file or in-memory StringIO buffer."""
+        if out_file and output_filepath:
+            out_file.flush()
+            try:
+                return Path(output_filepath).read_text(encoding="utf-8")
+            except Exception:
+                return ""
+        if isinstance(sys.stdout, io.StringIO):
+            return sys.stdout.getvalue()
+        return ""
+
     try:
         apply_system_limits(config)
         safe_env = create_safe_environment(config, tools)
@@ -284,53 +296,23 @@ def isolated_worker(
         executable_code = transform_to_interactive_code(code)
         exec(executable_code, safe_env)
 
-        if out_file and output_filepath:
-            out_file.flush()
-            captured = Path(output_filepath).read_text(encoding="utf-8")
-        else:
-            captured = (
-                sys.stdout.getvalue()
-                if hasattr(sys.stdout, "getvalue")
-                else ""
-            )
-
         result = {
             "status": "success",
-            "output": captured,
+            "output": get_captured_output(),
         }
 
     except FinalAnswerException as error:
-        if out_file and output_filepath:
-            out_file.flush()
-            captured = Path(output_filepath).read_text(encoding="utf-8")
-        else:
-            captured = (
-                sys.stdout.getvalue()
-                if hasattr(sys.stdout, "getvalue")
-                else ""
-            )
-
         result = {
             "status": "final_answer",
             "answer": error.answer,
-            "output": captured,
+            "output": get_captured_output(),
         }
     except Exception as error:
-        if out_file and output_filepath:
-            out_file.flush()
-            captured = Path(output_filepath).read_text(encoding="utf-8")
-        else:
-            captured = (
-                sys.stdout.getvalue()
-                if hasattr(sys.stdout, "getvalue")
-                else ""
-            )
-
         result = {
             "status": "error",
             "error": traceback.format_exc(),
             "error_type": type(error).__name__,
-            "output": captured,
+            "output": get_captured_output(),
         }
     finally:
         sys.stdout = original_stdout
