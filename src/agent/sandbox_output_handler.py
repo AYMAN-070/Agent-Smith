@@ -177,6 +177,12 @@ class SandboxOutputHandler:
             sand_answer.get("error") or "Execution failed without details."
         )
         error_trace = cls.clean_and_truncate(code, raw_error)
+        partial_output = sand_answer.get("output", "").strip()
+        if partial_output:
+            cleaned_partial = cls.clean_and_truncate(code, partial_output)
+            error_trace += (
+                f"\n\n[PARTIAL OUTPUT BEFORE INTERRUPTION]:\n{cleaned_partial}"
+            )
         print("\n" + "!" * 50)
         print("❌ FAILED: Error detected in sandbox:")
         print("-" * 50)
@@ -233,6 +239,12 @@ class SandboxOutputHandler:
 
         raw_error = sand_answer.get("error") or "Unknown execution error."
         error_trace = cls.clean_and_truncate(code, raw_error)
+        partial_output = sand_answer.get("output", "").strip()
+        if partial_output:
+            cleaned_partial = cls.clean_and_truncate(code, partial_output)
+            error_trace += (
+                f"\n\n[PARTIAL OUTPUT BEFORE INTERRUPTION]:\n{cleaned_partial}"
+            )
         print("\n" + "!" * 50)
         print("❌ FAILED: Error detected in sandbox:")
         print(f"{error_trace}")

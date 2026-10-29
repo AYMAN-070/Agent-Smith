@@ -156,12 +156,22 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
             if old_str not in data:
                 return f"Error: old_str not found in {filepath}."
             data = data.replace(old_str, new_str)
+            syntax_notice = ""
+            if filepath.endswith(".py"):
+                try:
+                    import ast
+                    ast.parse(data)
+                except SyntaxError as e:
+                    syntax_notice = (
+                        f" (Warning: edit introduced a SyntaxError on "
+                        f"line {e.lineno}: {e.msg})"
+                    )
             write_res = _docker_exec(
                 ["tee", str(target_path)], input_text=data
             )
             if write_res.returncode != 0:
                 return f"Error writing file '{filepath}': {write_res.stderr}"
-            return "FILE EDITED"
+            return f"FILE EDITED{syntax_notice}"
         except subprocess.TimeoutExpired:
             return f"Error: Editing file '{filepath}' timed out."
         except Exception as e:
@@ -183,10 +193,20 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
         return f"Error: old_str not found in {filepath}."
 
     data = data.replace(old_str, new_str)
+    syntax_notice = ""
+    if filepath.endswith(".py"):
+        try:
+            import ast
+            ast.parse(data)
+        except SyntaxError as e:
+            syntax_notice = (
+                f" (Warning: edit introduced a SyntaxError on "
+                f"line {e.lineno}: {e.msg})"
+            )
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.write(data)
-        return "FILE EDITED"
+        return f"FILE EDITED{syntax_notice}"
     except Exception as e:
         return f"Error writing file '{filepath}': {e}"
 
