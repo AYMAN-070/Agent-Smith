@@ -1,0 +1,81 @@
+{
+  "task_id": "pydata__xarray-4629",
+  "benchmark": "swebench",
+  "success": true,
+  "solution": "diff --git a/xarray/core/merge.py b/xarray/core/merge.py\nindex a41edc7..b12009b 100644\n--- a/xarray/core/merge.py\n+++ b/xarray/core/merge.py\n@@ -501,7 +501,7 @@ def merge_attrs(variable_attrs, combine_attrs):\n     elif combine_attrs == \"override\":\n-        return variable_attrs[0]\n+        return dict(variable_attrs[0])\n     elif combine_attrs == \"drop\":\n",
+  "iterations": 5,
+  "total_requests": 5,
+  "total_input_tokens": 8990,
+  "total_output_tokens": 140,
+  "total_time_seconds": 10.79,
+  "steps": [
+    {
+      "step": 1,
+      "input_tokens": 1520,
+      "output_tokens": 28,
+      "request_time_ms": 1349.0,
+      "timestamp": "2026-10-28T14:10:01.120000",
+      "api_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "model_name": "gemini-3.1-flash-lite",
+      "llm_output": "```python\nprint(search_code('return variable_attrs[0]', 'xarray/core/merge.py'))\n```",
+      "sandbox_input": "print(search_code('return variable_attrs[0]', 'xarray/core/merge.py'))",
+      "sandbox_output": "/testbed/xarray/core/merge.py:42: return variable_attrs[0]\n",
+      "retries": 0
+    },
+    {
+      "step": 2,
+      "input_tokens": 1640,
+      "output_tokens": 30,
+      "request_time_ms": 1448.4,
+      "timestamp": "2026-10-28T14:10:04.250000",
+      "api_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "model_name": "gemini-3.1-flash-lite",
+      "llm_output": "```python\nprint(read_file('xarray/core/merge.py', 30, 60))\n```",
+      "sandbox_input": "print(read_file('xarray/core/merge.py', 30, 60))",
+      "sandbox_output": "30: code line around xarray/core/merge.py\n42: return variable_attrs[0]\n",
+      "retries": 0
+    },
+    {
+      "step": 3,
+      "input_tokens": 1780,
+      "output_tokens": 42,
+      "request_time_ms": 1391.6,
+      "timestamp": "2026-10-28T14:10:07.410000",
+      "api_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "model_name": "gemini-3.1-flash-lite",
+      "llm_output": "```python\nprint(edit_file('xarray/core/merge.py', 'return variable_attrs[0]', 'fixed_code'))\n```",
+      "sandbox_input": "print(edit_file('xarray/core/merge.py', 'return variable_attrs[0]', 'fixed_code'))",
+      "sandbox_output": "File updated successfully.\n",
+      "retries": 0
+    },
+    {
+      "step": 4,
+      "input_tokens": 1950,
+      "output_tokens": 18,
+      "request_time_ms": 1491.0,
+      "timestamp": "2026-10-28T14:10:11.890000",
+      "api_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "model_name": "gemini-3.1-flash-lite",
+      "llm_output": "```python\nprint(run_tests())\n```",
+      "sandbox_input": "print(run_tests())",
+      "sandbox_output": "PASSED [100%] All tests passed successfully\n",
+      "retries": 0
+    },
+    {
+      "step": 5,
+      "input_tokens": 2100,
+      "output_tokens": 22,
+      "request_time_ms": 1306.4,
+      "timestamp": "2026-10-28T14:10:14.300000",
+      "api_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "model_name": "gemini-3.1-flash-lite",
+      "llm_output": "```python\nprint(get_patch())\nfinal_answer(get_patch())\n```",
+      "sandbox_input": "print(get_patch())\nfinal_answer(get_patch())",
+      "sandbox_output": "diff --git a/xarray/core/merge.py b/xarray/core/merge.py\nindex a41edc7..b12009b 100644\n--- a/xarray/core/merge.py\n+++ b/xarray/core/merge.py\n@@ -501,7 +501,7 @@ def merge_attrs(variable_attrs, combine_attrs):\n     elif combine_attrs == \"override\":\n-        return variable_attrs[0]\n+        return dict(variable_attrs[0])\n     elif combine_attrs == \"drop\":\n",
+      "retries": 0
+    }
+  ],
+  "system_prompt": "You are an autonomous Software Engineer Agent solving real-world GitHub issues.",
+  "error": null,
+  "timestamp": "2026-10-28T14:10:16.000000"
+}
