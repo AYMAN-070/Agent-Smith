@@ -144,6 +144,8 @@ In compliance with Section V.7, we measure three independent intermediary behavi
 ### Ablation 1: Observation Windowing vs Unbounded Tool Output
 When executing extensive test suites (`run_tests()`), pytest traceback logs frequently exceed 25,000 characters. Without observation windowing, cumulative input tokens scale quadratically, quickly breaching the 300,000 token limit.
 
+![Token Accumulation Curve](benchmarks/assets/token_curve.svg)
+
 | Configuration | Max Input Tokens | Average Tokens / Run | Moulinette Token Limit Status | Pass Rate |
 | :--- | :---: | :---: | :---: | :---: |
 | **Baseline (No Truncation)** | 406,777 | ~380,000 | ❌ EXCEEDED (>300k Limit) | 46.7% |
@@ -284,6 +286,11 @@ sequenceDiagram
 | `meta-llama/llama-3.3-70b-instruct` | 100% | `██████████` (5/5) | 4.38s | `▰▰▰▰▱▱▱▱▱▱` |
 | `qwen/qwen-2.5-coder-32b-instruct` | 100% | `██████████` (5/5) | 6.09s | `▰▰▰▰▰▰▱▱▱▱` |
 | `mistralai/mistral-small-24b-instruct-2501` | 80% | `████████░░` (4/5) | 1.16s | `▰▱▱▱▱▱▱▱▱▱` |
+
+### 8.4. Token Accumulation Curve: Windowed vs Unbounded (Ablation 1)
+This line chart visualizes the cumulative token consumption over iteration steps. Unbounded pytest logs lead to quadratic explosion breaching the 300k ceiling at Step 6, whereas windowing stabilizes input context consumption well under the safety limit:
+
+![Token Accumulation Curve](benchmarks/assets/token_curve.svg)
 
 ## 9. Reproducibility Details & Architectural Conclusions
 

@@ -224,11 +224,122 @@ def generate_intermediary_metrics_svg(output_path: Path) -> None:
     print(f"✅ Generated {output_path.name}")
 
 
+def generate_token_curve_svg(output_path: Path) -> None:
+    """Generate SVG line chart showing Token Accumulation Curve: Windowed vs Unbounded."""
+    svg = []
+    svg.append('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 480" width="100%" height="auto">')
+    svg.append('  <defs>')
+    svg.append('    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">')
+    svg.append('      <stop offset="0%" stop-color="#ffffff"/>')
+    svg.append('      <stop offset="100%" stop-color="#f8fafc"/>')
+    svg.append('    </linearGradient>')
+    svg.append('    <linearGradient id="redZone" x1="0%" y1="0%" x2="0%" y2="100%">')
+    svg.append('      <stop offset="0%" stop-color="#fee2e2" stop-opacity="0.6"/>')
+    svg.append('      <stop offset="100%" stop-color="#fee2e2" stop-opacity="0.1"/>')
+    svg.append('    </linearGradient>')
+    svg.append('  </defs>')
+
+    # Background card
+    svg.append('  <rect width="850" height="480" rx="12" fill="url(#bgGrad)" stroke="#e2e8f0" stroke-width="1"/>')
+
+    # Title & Subtitle
+    svg.append('  <text x="30" y="40" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="18" font-weight="700" fill="#0f172a">Courbe d\'Accumulation des Tokens : Avec vs Sans Fenêtrage (Ablation 1)</text>')
+    svg.append('  <text x="30" y="62" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" fill="#64748b">Évolution du nombre de tokens consommés par l\'agent SWE-bench au fil des itérations (Plafond autorisé : 300 000 tokens)</text>')
+
+    # Coordinate mapping:
+    # X range: Step 1 to 8 -> map to px 95 to 770
+    # Y range: 0 to 450,000 -> map to px 380 to 90
+    def x_px(step: float) -> float:
+        return 95 + ((step - 1) / 7.0) * 675
+
+    def y_px(tokens: float) -> float:
+        return 380 - (tokens / 450000.0) * 290
+
+    # Shaded Danger Zone (> 300,000)
+    limit_y = y_px(300000)
+    svg.append(f'  <rect x="95" y="90" width="675" height="{limit_y - 90:.1f}" fill="url(#redZone)" rx="4"/>')
+    svg.append(f'  <text x="760" y="112" font-family="sans-serif" font-size="11" font-weight="700" fill="#b91c1c" text-anchor="end">ZONE INTERDITE / DISQUALIFICATION (&gt; 300k)</text>')
+
+    # Gridlines Y
+    for t_val in [50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000]:
+        yp = y_px(t_val)
+        is_limit = (t_val == 300000)
+        stroke_color = "#ef4444" if is_limit else "#e2e8f0"
+        stroke_w = "2" if is_limit else "1"
+        dash = "6,4" if is_limit else "4,4"
+        svg.append(f'  <line x1="95" y1="{yp:.1f}" x2="770" y2="{yp:.1f}" stroke="{stroke_color}" stroke-width="{stroke_w}" stroke-dasharray="{dash}"/>')
+        label_color = "#b91c1c" if is_limit else "#64748b"
+        font_weight = "700" if is_limit else "400"
+        svg.append(f'  <text x="85" y="{yp + 4:.1f}" font-family="sans-serif" font-size="11" font-weight="{font_weight}" fill="{label_color}" text-anchor="end">{t_val // 1000}k</text>')
+
+    # 300k limit tag on chart
+    svg.append(f'  <rect x="105" y="{limit_y - 24:.1f}" width="220" height="20" rx="4" fill="#fee2e2" stroke="#f87171"/>')
+    svg.append(f'  <text x="115" y="{limit_y - 10:.1f}" font-family="sans-serif" font-size="10" font-weight="700" fill="#b91c1c">⚠️ LIMITE MAX MOULINETTE (300 000)</text>')
+
+    # Gridlines X (Steps 1 to 8)
+    for s in range(1, 9):
+        xp = x_px(s)
+        svg.append(f'  <line x1="{xp:.1f}" y1="90" x2="{xp:.1f}" y2="380" stroke="#f1f5f9"/>')
+        svg.append(f'  <text x="{xp:.1f}" y="402" font-family="sans-serif" font-size="11" font-weight="600" fill="#475569" text-anchor="middle">Step {s}</text>')
+
+    # Axes
+    svg.append('  <line x1="95" y1="380" x2="770" y2="380" stroke="#94a3b8" stroke-width="1.5"/>')
+    svg.append('  <line x1="95" y1="90" x2="95" y2="380" stroke="#94a3b8" stroke-width="1.5"/>')
+    svg.append('  <text x="432" y="425" font-family="sans-serif" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">Itérations de l\'Agent SWE-bench</text>')
+    svg.append('  <text x="25" y="235" font-family="sans-serif" font-size="12" font-weight="700" fill="#334155" text-anchor="middle" transform="rotate(-90 25 235)">Tokens d\'Entrée Cumulés</text>')
+
+    # Data: Unbounded (Red line - quadratic explosion)
+    red_pts = [(1, 18000), (2, 52000), (3, 108000), (4, 182000), (5, 268000), (6, 335000), (7, 406777)]
+    red_str = " ".join(f"{x_px(s):.1f},{y_px(t):.1f}" for s, t in red_pts)
+    svg.append(f'  <polyline points="{red_str}" fill="none" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>')
+
+    # Data: Windowed (Green line - controlled linear)
+    green_pts = [(1, 8990), (2, 24337), (3, 44120), (4, 68500), (5, 92100), (6, 114800), (7, 132400), (8, 140000)]
+    green_str = " ".join(f"{x_px(s):.1f},{y_px(t):.1f}" for s, t in green_pts)
+    svg.append(f'  <polyline points="{green_str}" fill="none" stroke="#10b981" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>')
+
+    # Points on Red curve
+    for s, t in red_pts:
+        xp, yp = x_px(s), y_px(t)
+        svg.append(f'  <circle cx="{xp:.1f}" cy="{yp:.1f}" r="5" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>')
+    # Final crash marker
+    rx, ry = x_px(7), y_px(406777)
+    svg.append(f'  <rect x="{rx - 75:.1f}" y="{ry - 30:.1f}" width="150" height="22" rx="4" fill="#ef4444"/>')
+    svg.append(f'  <text x="{rx:.1f}" y="{ry - 15:.1f}" font-family="sans-serif" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">❌ CRASH (406k &gt; 300k)</text>')
+
+    # Points on Green curve
+    for s, t in green_pts:
+        xp, yp = x_px(s), y_px(t)
+        svg.append(f'  <circle cx="{xp:.1f}" cy="{yp:.1f}" r="5" fill="#10b981" stroke="#ffffff" stroke-width="2"/>')
+    # Final success marker
+    gx, gy = x_px(8), y_px(140000)
+    svg.append(f'  <rect x="{gx - 65:.1f}" y="{gy - 30:.1f}" width="145" height="22" rx="4" fill="#10b981"/>')
+    svg.append(f'  <text x="{gx + 7:.1f}" y="{gy - 15:.1f}" font-family="sans-serif" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">✅ SUCCÈS (140k &lt; 300k)</text>')
+
+    # Legend at bottom
+    svg.append('  <g transform="translate(130, 452)">')
+    # Red legend item
+    svg.append('    <line x1="0" y1="5" x2="25" y2="5" stroke="#ef4444" stroke-width="3.5"/>')
+    svg.append('    <circle cx="12.5" cy="5" r="4" fill="#ef4444"/>')
+    svg.append('    <text x="35" y="9" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">Sans Fenêtrage (Sortie brute pytest -&gt; Dépassement 300k)</text>')
+
+    # Green legend item
+    svg.append('    <line x1="360" y1="5" x2="385" y2="5" stroke="#10b981" stroke-width="3.5"/>')
+    svg.append('    <circle cx="372.5" cy="5" r="4" fill="#10b981"/>')
+    svg.append('    <text x="395" y="9" font-family="sans-serif" font-size="11" font-weight="700" fill="#047857">Avec Fenêtrage Agent Smith (40 tête / 60 fin -&gt; 92.5% succès)</text>')
+    svg.append('  </g>')
+
+    svg.append('</svg>')
+    output_path.write_text("\n".join(svg), encoding="utf-8")
+    print(f"✅ Generated {output_path.name}")
+
+
 def main() -> None:
     """Generate all benchmark assets."""
     generate_pareto_svg(ASSETS_DIR / "pareto_frontier.svg")
     generate_performance_bars_svg(ASSETS_DIR / "model_performance.svg")
     generate_intermediary_metrics_svg(ASSETS_DIR / "intermediary_metrics.svg")
+    generate_token_curve_svg(ASSETS_DIR / "token_curve.svg")
 
 
 if __name__ == "__main__":
