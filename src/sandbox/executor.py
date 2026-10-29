@@ -1,5 +1,7 @@
 """Isolated code execution sandbox with security constraints and resource limits."""
 
+from __future__ import annotations
+
 import ast
 import builtins
 import io
@@ -184,7 +186,7 @@ def apply_network_block() -> None:
         "fromfd",
     ):
         setattr(socket, attr, blocked_func)
-    setattr(socket, "socket", BlockedSocket)
+    socket.socket = BlockedSocket
 
     try:
         import _socket
@@ -196,7 +198,7 @@ def apply_network_block() -> None:
             "getnameinfo",
         ):
             setattr(_socket, attr, blocked_func)
-        setattr(_socket, "socket", BlockedSocket)
+        _socket.socket = BlockedSocket
     except (ImportError, AttributeError):
         pass
 

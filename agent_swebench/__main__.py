@@ -12,8 +12,8 @@ from typing import Any
 from src.agent.loop import SWEAgentLoop
 from src.docker_handler import DockerContainer
 from src.models import SWEBenchTaskInput
-from src.sandbox.executor import SandboxExecutor
 from src.rules import RulesSwe
+from src.sandbox.executor import SandboxExecutor
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -55,6 +55,13 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Optional provider API URL",
     )
+    parser.add_argument(
+        "--max_iterations",
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="Optional maximum loop iterations override",
+    )
     return parser.parse_args()
 
 
@@ -65,7 +72,7 @@ def main() -> None:
     task = SWEBenchTaskInput.model_validate_json(task_content)
     docker_container = DockerContainer(task.docker_image)
     sandbox = SandboxExecutor()
-    rules = RulesSwe()
+    rules = RulesSwe(args.max_iterations)
     atexit.register(docker_container.stop_and_remove)
 
     def clean_exit(signum: int, frame: Any) -> None:

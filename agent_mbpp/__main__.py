@@ -10,8 +10,8 @@ from typing import Any
 
 from src.agent.loop import MBPPAgentLoop
 from src.models import MBPPTaskInput
+from src.rules import RulesMbpp
 from src.sandbox.executor import SandboxExecutor
-from src.rules import RulesMpbb
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -53,6 +53,13 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Optional provider API URL",
     )
+    parser.add_argument(
+        "--max_iterations",
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="Optional maximum loop iterations override",
+    )
     return parser.parse_args()
 
 
@@ -61,7 +68,7 @@ def main() -> None:
     args = parse_arguments()
     task_content = Path(args.task_file).read_text(encoding="utf-8")
     task = MBPPTaskInput.model_validate_json(task_content)
-    rules = RulesMpbb()
+    rules = RulesMbpp(args.max_iterations)
 
     sandbox = SandboxExecutor()
     atexit.register(sandbox.close)

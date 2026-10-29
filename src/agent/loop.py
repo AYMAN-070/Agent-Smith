@@ -11,7 +11,7 @@ from src.models import (
     StepMetrics,
     SWEBenchTaskInput,
 )
-from src.rules import RulesMpbb, RulesSwe
+from src.rules import RulesMbpp, RulesSwe
 from src.sandbox.executor import SandboxExecutor
 
 
@@ -21,13 +21,12 @@ class MBPPAgentLoop(BaseAgentLoop):
     benchmark = "mbpp"
     failure_return_value = "didnt succeed"
     failure_solution_value = "didnt succeed"
-    timeout_margin = 10.0
 
     def __init__(
         self,
         task: MBPPTaskInput,
         sandbox: SandboxExecutor,
-        rules: RulesMpbb,
+        rules: RulesMbpp,
         output_path: str = "solution.json",
         model_name: str | None = None,
         provider_url: str | None = None,
@@ -52,6 +51,7 @@ class MBPPAgentLoop(BaseAgentLoop):
         print("\n" + "=" * 50)
         print("🚀 START MBPP AGENT LOOP")
         print("=" * 50)
+        self._save_checkpoint(steps_metric, start_time)
 
         while current_loop < max_loop:
             step = current_loop + 1
@@ -73,6 +73,7 @@ class MBPPAgentLoop(BaseAgentLoop):
                     self.handle_no_code(llm_response, step, max_loop)
                 )
                 current_loop += 1
+                self._save_checkpoint(steps_metric, start_time)
                 limit_error = self.limit_checker(steps_metric, start_time)
                 if limit_error:
                     return self._save_failure(
@@ -128,6 +129,7 @@ class MBPPAgentLoop(BaseAgentLoop):
             )
 
             current_loop += 1
+            self._save_checkpoint(steps_metric, start_time)
 
             limit_error = self.limit_checker(steps_metric, start_time)
             if limit_error:
@@ -148,7 +150,6 @@ class SWEAgentLoop(BaseAgentLoop):
     benchmark = "swebench"
     failure_return_value = "FAILED"
     failure_solution_value = ""
-    timeout_margin = 30.0
 
     def __init__(
         self,
@@ -183,6 +184,7 @@ class SWEAgentLoop(BaseAgentLoop):
         print("\n" + "=" * 50)
         print("🛠️ START SWE AGENT LOOP")
         print("=" * 50)
+        self._save_checkpoint(steps_metric, start_time)
 
         while current_loop < max_loop:
             step = current_loop + 1
@@ -202,6 +204,7 @@ class SWEAgentLoop(BaseAgentLoop):
                     self.handle_no_code(llm_response, step, max_loop)
                 )
                 current_loop += 1
+                self._save_checkpoint(steps_metric, start_time)
                 limit_error = self.limit_checker(steps_metric, start_time)
                 if limit_error:
                     return self._save_failure(
@@ -275,11 +278,10 @@ class SWEAgentLoop(BaseAgentLoop):
             self.prompt.add_model_response(
                 f"```python\n{code_for_sandbox}\n```"
             )
-            self.prompt.add_feedback(
-                feedback, step=step, max_steps=max_loop
-            )
+            self.prompt.add_feedback(feedback, step=step, max_steps=max_loop)
 
             current_loop += 1
+            self._save_checkpoint(steps_metric, start_time)
 
             limit_error = self.limit_checker(steps_metric, start_time)
             if limit_error:
