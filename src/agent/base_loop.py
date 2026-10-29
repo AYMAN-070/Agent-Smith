@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from src.agent.sandbox_output_handler import SandboxOutputHandler
 from src.llm.llm import LlmRequest, LlmResponse
 from src.models import (
     MBPPTaskInput,
@@ -21,6 +22,7 @@ class BaseAgentLoop:
     benchmark: str = ""
     failure_return_value: str = "didnt succeed"
     failure_solution_value: str = ""
+    timeout_margin: float = 10.0
 
     def __init__(
         self,
@@ -70,8 +72,37 @@ class BaseAgentLoop:
         )
         return step_metric
 
+    def record_no_code_step(
+        self, llm: LlmResponse, step: int
+    ) -> StepMetrics:
+        """Record step metrics for an iteration where no code was generated."""
+        sand_answer = {
+            "status": "error",
+            "error": "No Python code found",
+            "output": "",
+        }
+        return self.record_step(llm, sand_answer, step)
+
+    def handle_no_code(
+        self,
+        llm_response: LlmResponse,
+        step: int,
+        max_loop: int,
+    ) -> StepMetrics:
+        """Handle prompt feedback and record step metrics when no code was generated."""
+        print(
+            "⚠️  [Warning]: No code block detected. Prompting LLM to format correctly."
+        )
+        feedback = SandboxOutputHandler.get_no_code_feedback(self.benchmark)
+        self.prompt.add_model_response(llm_response.llm_output)
+        self.prompt.add_feedback(feedback, step=step, max_steps=max_loop)
+        return self.record_no_code_step(llm_response, step)
+
     def limit_checker(
-        self, steps: list[StepMetrics], start_time: float | None = None
+        self,
+        steps: list[StepMetrics],
+        start_time: float | None = None,
+        is_final_answer: bool = False,
     ) -> str | None:
         """Check if any token, iteration, or timeout limit defined in rules is exceeded."""
         total_input = sum(step.input_tokens for step in steps)
@@ -88,12 +119,20 @@ class BaseAgentLoop:
 
         if start_time is not None:
             elapsed_time = time.time() - start_time
-            if elapsed_time > self.rules.timeout:
+            effective_timeout = max(
+                0.0, self.rules.timeout - self.timeout_margin
+            )
+            if elapsed_time > effective_timeout:
                 msg = f"Timeout exceeded: {elapsed_time:.2f}s > {self.rules.timeout}s"
                 print(f"⚠️ {msg}")
                 return msg
 
-        if len(steps) >= self.rules.iterations:
+        max_allowed_iterations = (
+            self.rules.iterations
+            if is_final_answer
+            else self.rules.iterations - 1
+        )
+        if len(steps) > max_allowed_iterations:
             msg = f"Iteration limit reached: {len(steps)} >= {self.rules.iterations}"
             print(f"⚠️ {msg}")
             return msg
