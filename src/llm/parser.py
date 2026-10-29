@@ -123,6 +123,8 @@ class ResponseParser:
 
         # 6. Raw Python code without markdown code fence
         clean_output = llm_output.strip()
+        if not clean_output:
+            return ""
         try:
             compile(clean_output, "<string>", "exec")
             self.is_malformed = True

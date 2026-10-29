@@ -8,10 +8,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from src.agent.loop import MBPPAgentLoop
-from src.models import MBPPTaskInput
-from src.rules import RulesMbpp
-from src.sandbox.executor import SandboxExecutor
+try:
+    from src.agent.loop import MBPPAgentLoop
+    from src.models import MBPPTaskInput
+    from src.rules import RulesMbpp
+    from src.sandbox.executor import SandboxExecutor
+except Exception as err:
+    print(f"Error importing modules: {err}", file=sys.stderr)
+    sys.exit(1)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -66,35 +70,38 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     """Run the MBPP agent workflow."""
     args = parse_arguments()
-    task_content = Path(args.task_file).read_text(encoding="utf-8")
-    task = MBPPTaskInput.model_validate_json(task_content)
-    rules = RulesMbpp(args.max_iterations)
-
-    sandbox = SandboxExecutor()
-    atexit.register(sandbox.close)
-
-    def clean_exit(signum: int, frame: Any) -> None:
-        """Handle termination signals and cleanup sandbox."""
-        print("\nKill signal received, cleaning in progress...")
-        sandbox.close()
-        sys.exit(143)
-
-    signal.signal(signal.SIGTERM, clean_exit)
-    signal.signal(signal.SIGINT, clean_exit)
-    if hasattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, clean_exit)
-
-    if args.mcp_server:
-        sandbox.connect_mcp(server_url=args.mcp_server)
-    elif args.mcp_stdio:
-        sandbox.connect_mcp(stdio_cmd=args.mcp_stdio)
-    else:
-        root_dir = Path(__file__).resolve().parent.parent
-        default_server = root_dir / "mcp_tools_mbpp.py"
-        cmd = f"python3 {shlex.quote(str(default_server))}"
-        sandbox.connect_mcp(stdio_cmd=cmd)
+    sandbox: SandboxExecutor | None = None
 
     try:
+        task_content = Path(args.task_file).read_text(encoding="utf-8")
+        task = MBPPTaskInput.model_validate_json(task_content)
+        rules = RulesMbpp(args.max_iterations)
+
+        sandbox = SandboxExecutor()
+        atexit.register(sandbox.close)
+
+        def clean_exit(signum: int, frame: Any) -> None:
+            """Handle termination signals and cleanup sandbox."""
+            print("\nKill signal received, cleaning in progress...")
+            if sandbox:
+                sandbox.close()
+            sys.exit(143)
+
+        signal.signal(signal.SIGTERM, clean_exit)
+        signal.signal(signal.SIGINT, clean_exit)
+        if hasattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, clean_exit)
+
+        if args.mcp_server:
+            sandbox.connect_mcp(server_url=args.mcp_server)
+        elif args.mcp_stdio:
+            sandbox.connect_mcp(stdio_cmd=args.mcp_stdio)
+        else:
+            root_dir = Path(__file__).resolve().parent.parent
+            default_server = root_dir / "mcp_tools_mbpp.py"
+            cmd = f"python3 {shlex.quote(str(default_server))}"
+            sandbox.connect_mcp(stdio_cmd=cmd)
+
         agent = MBPPAgentLoop(
             task=task,
             sandbox=sandbox,
@@ -108,7 +115,8 @@ def main() -> None:
         print(f"\n{err}", file=sys.stderr)
         sys.exit(1)
     finally:
-        sandbox.close()
+        if sandbox:
+            sandbox.close()
 
 
 if __name__ == "__main__":

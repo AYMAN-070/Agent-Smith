@@ -58,9 +58,17 @@ class MBPPAgentLoop(BaseAgentLoop):
             print(f"\n--- [ITERATION {step}/{max_loop}] ---")
 
             print("\n🤖 [1/3] Calling LLM with current prompt/history...")
-            llm_response: LlmResponse = self.llm_request.generate_code(
-                self.prompt
-            )
+            try:
+                llm_response: LlmResponse = self.llm_request.generate_code(
+                    self.prompt
+                )
+            except Exception as err:
+                print(f"❌ LLM generation error: {err}")
+                return self._save_failure(
+                    steps_metric,
+                    start_time,
+                    error=f"LLM cascade failure: {err}",
+                )
             code_for_sandbox = llm_response.code
             print("\n📥 [LLM Generated Code]:")
             print(
@@ -191,7 +199,15 @@ class SWEAgentLoop(BaseAgentLoop):
             print(f"\n--- [SWE ITERATION {step}/{max_loop}] ---")
 
             print("\n🤖 [1/3] Calling LLM with current prompt/history...")
-            llm_response = self.llm_request.generate_code(self.prompt)
+            try:
+                llm_response = self.llm_request.generate_code(self.prompt)
+            except Exception as err:
+                print(f"❌ LLM generation error: {err}")
+                return self._save_failure(
+                    steps_metric,
+                    start_time,
+                    error=f"LLM cascade failure: {err}",
+                )
             code_for_sandbox = llm_response.code
             print("\n📥 [LLM Generated Code]:")
             print(
