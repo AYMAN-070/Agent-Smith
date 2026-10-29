@@ -21,6 +21,7 @@ class MBPPAgentLoop(BaseAgentLoop):
     benchmark = "mbpp"
     failure_return_value = "didnt succeed"
     failure_solution_value = "didnt succeed"
+    timeout_margin = 10.0
 
     def __init__(
         self,
@@ -68,22 +69,8 @@ class MBPPAgentLoop(BaseAgentLoop):
                 else "(No Python code detected)"
             )
             if not code_for_sandbox:
-                print(
-                    "⚠️  [Warning]: No code block detected. Prompting LLM to format correctly."
-                )
-                feedback = SandboxOutputHandler.get_no_code_feedback("mbpp")
-                self.prompt.add_model_response(llm_response.llm_output)
-                self.prompt.add_error_feedback(
-                    feedback, step=step, max_steps=max_loop
-                )
-
-                sand_answer = {
-                    "status": "error",
-                    "error": "No Python code found",
-                    "output": "",
-                }
                 steps_metric.append(
-                    self.record_step(llm_response, sand_answer, step)
+                    self.handle_no_code(llm_response, step, max_loop)
                 )
                 current_loop += 1
                 limit_error = self.limit_checker(steps_metric, start_time)
@@ -112,6 +99,14 @@ class MBPPAgentLoop(BaseAgentLoop):
                 )
                 print(f"Final Solution:\n{solution}")
                 print("=" * 50 + "\n")
+
+                limit_error = self.limit_checker(
+                    steps_metric, start_time, is_final_answer=True
+                )
+                if limit_error:
+                    return self._save_failure(
+                        steps_metric, start_time, limit_error
+                    )
 
                 self._save_solution(
                     status=True,
@@ -153,6 +148,7 @@ class SWEAgentLoop(BaseAgentLoop):
     benchmark = "swebench"
     failure_return_value = "FAILED"
     failure_solution_value = ""
+    timeout_margin = 30.0
 
     def __init__(
         self,
@@ -202,22 +198,8 @@ class SWEAgentLoop(BaseAgentLoop):
                 else "(No Python code detected)"
             )
             if not code_for_sandbox:
-                print(
-                    "⚠️  [Warning]: No code block detected. Prompting LLM to format correctly."
-                )
-                feedback = SandboxOutputHandler.get_no_code_feedback("swebench")
-                self.prompt.add_model_response(llm_response.llm_output)
-                self.prompt.add_feedback(
-                    feedback, step=step, max_steps=max_loop
-                )
-
-                sand_answer = {
-                    "status": "error",
-                    "error": "No Python code found",
-                    "output": "",
-                }
                 steps_metric.append(
-                    self.record_step(llm_response, sand_answer, step)
+                    self.handle_no_code(llm_response, step, max_loop)
                 )
                 current_loop += 1
                 limit_error = self.limit_checker(steps_metric, start_time)
@@ -259,6 +241,14 @@ class SWEAgentLoop(BaseAgentLoop):
                         candidate_patch = patch_res["output"].strip()
                         if any(m in candidate_patch for m in patch_markers):
                             solution = candidate_patch
+
+                limit_error = self.limit_checker(
+                    steps_metric, start_time, is_final_answer=True
+                )
+                if limit_error:
+                    return self._save_failure(
+                        steps_metric, start_time, limit_error
+                    )
 
                 self._save_solution(
                     status=True,
