@@ -1,6 +1,10 @@
 """Docker container manager for isolated benchmark evaluation."""
 
+import os
 import subprocess
+import sys
+import time
+import uuid
 
 
 class DockerContainer:
@@ -10,26 +14,75 @@ class DockerContainer:
         """Initialize Docker container manager with the target image name."""
         self.image_name = image_name
         self.container_id: str | None = None
+        self._proc: subprocess.Popen[str] | None = None
 
     def start(self) -> str:
-        """Pulls the image if necessary, starts the container,
-        and keeps it alive with tail -f /dev/null."""
+        """Pull the image if necessary, start the container,
+        and link its lifecycle to the parent process.
+        """
         subprocess.run(["docker", "pull", self.image_name], check=True)
-        res = subprocess.run(
+        container_name = f"sweb_eval_{uuid.uuid4().hex[:12]}"
+
+        # Start container with --rm and open stdin (-i)
+        self._proc = subprocess.Popen(
             [
                 "docker",
                 "run",
-                "-d",
+                "--rm",
+                "-i",
+                "--name",
+                container_name,
                 self.image_name,
-                "tail",
-                "-f",
-                "/dev/null",
+                "sh",
+                "-c",
+                "cat > /dev/null",
             ],
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             text=True,
-            check=True,
         )
-        self.container_id = res.stdout.strip()
+        self.container_id = container_name
+
+        # Wait until the container is running and ready for docker exec
+        for _ in range(50):
+            res = subprocess.run(
+                [
+                    "docker",
+                    "inspect",
+                    "-f",
+                    "{{.State.Running}}",
+                    container_name,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if res.stdout.strip() == "true":
+                break
+            time.sleep(0.1)
+
+        # Launch a detached watchdog process to ensure cleanup even after kill -9
+        ppid = os.getpid()
+        watchdog_code = (
+            f"import os, time, subprocess\n"
+            f"ppid = {ppid}\n"
+            f"cname = '{container_name}'\n"
+            f"while True:\n"
+            f"    try:\n"
+            f"        os.kill(ppid, 0)\n"
+            f"    except OSError:\n"
+            f"        subprocess.run(['docker', 'rm', '-f', cname], "
+            f"stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+            f"        break\n"
+            f"    time.sleep(1)\n"
+        )
+        subprocess.Popen(
+            [sys.executable, "-c", watchdog_code],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
         return self.container_id
 
     def write_file(self, path_in_container: str, content: str) -> None:
@@ -65,6 +118,17 @@ class DockerContainer:
         """Stops and removes the container to guarantee clean workspace."""
         if self.container_id:
             subprocess.run(
-                ["docker", "rm", "-f", self.container_id], check=False
+                ["docker", "rm", "-f", self.container_id],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
+            if self._proc:
+                try:
+                    if self._proc.stdin:
+                        self._proc.stdin.close()
+                    self._proc.terminate()
+                except Exception:
+                    pass
+                self._proc = None
             self.container_id = None

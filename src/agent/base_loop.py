@@ -50,7 +50,11 @@ class BaseAgentLoop:
         return ""
 
     def record_step(
-        self, llm: LlmResponse, sandbox: dict[str, Any], step: int
+        self,
+        llm: LlmResponse,
+        sandbox: dict[str, Any],
+        step: int,
+        executed_code: str | None = None,
     ) -> StepMetrics:
         """Record metrics and execution output for an iteration step."""
         raw_output = (
@@ -58,6 +62,7 @@ class BaseAgentLoop:
             or sandbox.get("error")
             or sandbox.get("status", "")
         )
+        code_input = executed_code if executed_code is not None else llm.code
         step_metric = StepMetrics(
             step=step,
             input_tokens=llm.input_tokens,
@@ -66,7 +71,7 @@ class BaseAgentLoop:
             api_url=llm.url,
             model_name=llm.model_name,
             llm_output=llm.llm_output,
-            sandbox_input=llm.code,
+            sandbox_input=code_input,
             sandbox_output=str(raw_output),
             retries=llm.retries,
         )

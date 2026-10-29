@@ -93,7 +93,9 @@ class MBPPAgentLoop(BaseAgentLoop):
             sand_answer = self.sandbox.execute(code_for_sandbox)
             print("\n📤 [Sandbox Result]:", sand_answer)
             steps_metric.append(
-                self.record_step(llm_response, sand_answer, step)
+                self.record_step(
+                    llm_response, sand_answer, step, code_for_sandbox
+                )
             )
 
             status = sand_answer.get("status")
@@ -129,6 +131,14 @@ class MBPPAgentLoop(BaseAgentLoop):
             feedback = SandboxOutputHandler.get_mbpp_feedback(
                 code_for_sandbox, sand_answer
             )
+            if llm_response.is_malformed:
+                malformed_warn = (
+                    f"[WARNING: Code block was malformed: "
+                    f"{llm_response.malformed_reason}. "
+                    "Ensure future code is wrapped strictly in "
+                    "```python ... ```.]\n\n"
+                )
+                feedback = malformed_warn + feedback
             self.prompt.add_model_response(
                 f"```python\n{code_for_sandbox}\n```"
             )
@@ -232,7 +242,9 @@ class SWEAgentLoop(BaseAgentLoop):
             sand_answer = self.sandbox.execute(code_for_sandbox)
             print("\n📤 [Sandbox Result]:", sand_answer)
             steps_metric.append(
-                self.record_step(llm_response, sand_answer, step)
+                self.record_step(
+                    llm_response, sand_answer, step, code_for_sandbox
+                )
             )
 
             status = sand_answer.get("status")
@@ -291,6 +303,14 @@ class SWEAgentLoop(BaseAgentLoop):
                     code_for_sandbox, sand_answer, tests_passed, has_patch
                 )
             )
+            if llm_response.is_malformed:
+                malformed_warn = (
+                    f"[WARNING: Code block was malformed: "
+                    f"{llm_response.malformed_reason}. "
+                    "Ensure future code is wrapped strictly in "
+                    "```python ... ```.]\n\n"
+                )
+                feedback = malformed_warn + feedback
             self.prompt.add_model_response(
                 f"```python\n{code_for_sandbox}\n```"
             )
