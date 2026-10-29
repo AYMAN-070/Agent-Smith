@@ -81,7 +81,13 @@ def run_interactive_repl(executor: SandboxExecutor) -> None:
             if status == "final_answer":
                 print(f"final_answer captured: {result.get('answer')}")
             elif status == "error":
-                print(f"Error: {result.get('error')}", file=sys.stderr)
+                raw_error = result.get('error', '').strip()
+                error_line = raw_error.splitlines()[-1] if raw_error else "Unknown execution error"
+                print(f"Error: {error_line}", file=sys.stderr)
+                partial = result.get("output", "")
+                if partial:
+                    print(partial, end="" if partial.endswith("\n") else "\n")
+
             else:
                 out = result.get("output", "")
                 if out:

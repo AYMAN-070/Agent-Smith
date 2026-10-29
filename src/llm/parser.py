@@ -5,6 +5,8 @@ from typing import Any
 
 class ResponseParser:
     def __init__(self, llm_output: str) -> None:
+        self.is_malformed: bool = False
+        self.malformed_reason: str = ""
         self.code: str = self.output_sorting(llm_output)
 
     @classmethod
@@ -103,9 +105,30 @@ class ResponseParser:
         match = re.search(py_pattern, llm_output, re.DOTALL | re.IGNORECASE)
         if match:
             return match.group(1).strip()
+
+        # 5. Unclosed markdown code fence (recovered)
+        unclosed_pattern = r"```(?:python|py)?\s*\n(.*)$"
+        unclosed_match = re.search(unclosed_pattern, llm_output, re.DOTALL | re.IGNORECASE)
+        if unclosed_match:
+            candidate = unclosed_match.group(1).strip()
+            try:
+                compile(candidate, "<string>", "exec")
+                self.is_malformed = True
+                self.malformed_reason = (
+                    "Unclosed code fence (missing closing ```); interpreted anyway"
+                )
+                return candidate
+            except SyntaxError:
+                pass
+
+        # 6. Raw Python code without markdown code fence
         clean_output = llm_output.strip()
         try:
             compile(clean_output, "<string>", "exec")
+            self.is_malformed = True
+            self.malformed_reason = (
+                "Raw code without ```python fence; parsed via fallback"
+            )
             return clean_output
         except SyntaxError:
             return ""

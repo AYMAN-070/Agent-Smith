@@ -262,39 +262,83 @@ def isolated_worker(
     config: SandboxConfig,
     queue: Queue[Any],
     tools: dict[str, Any] | None = None,
+    output_filepath: str | None = None,
 ) -> None:
     """Execute code in a separate process and send its result through the queue."""
-    output = io.StringIO()
     original_stdout = sys.stdout
+    out_file = None
+
+    if output_filepath:
+        try:
+            out_file = open(output_filepath, "w", encoding="utf-8", buffering=1)
+            sys.stdout = out_file
+        except Exception:
+            sys.stdout = io.StringIO()
+    else:
+        sys.stdout = io.StringIO()
 
     try:
         apply_system_limits(config)
         safe_env = create_safe_environment(config, tools)
 
-        sys.stdout = output
         executable_code = transform_to_interactive_code(code)
         exec(executable_code, safe_env)
 
+        if out_file and output_filepath:
+            out_file.flush()
+            captured = Path(output_filepath).read_text(encoding="utf-8")
+        else:
+            captured = (
+                sys.stdout.getvalue()
+                if hasattr(sys.stdout, "getvalue")
+                else ""
+            )
+
         result = {
             "status": "success",
-            "output": output.getvalue(),
+            "output": captured,
         }
 
     except FinalAnswerException as error:
+        if out_file and output_filepath:
+            out_file.flush()
+            captured = Path(output_filepath).read_text(encoding="utf-8")
+        else:
+            captured = (
+                sys.stdout.getvalue()
+                if hasattr(sys.stdout, "getvalue")
+                else ""
+            )
+
         result = {
             "status": "final_answer",
             "answer": error.answer,
-            "output": output.getvalue(),
+            "output": captured,
         }
     except Exception as error:
+        if out_file and output_filepath:
+            out_file.flush()
+            captured = Path(output_filepath).read_text(encoding="utf-8")
+        else:
+            captured = (
+                sys.stdout.getvalue()
+                if hasattr(sys.stdout, "getvalue")
+                else ""
+            )
+
         result = {
             "status": "error",
             "error": traceback.format_exc(),
             "error_type": type(error).__name__,
-            "output": output.getvalue(),
+            "output": captured,
         }
     finally:
         sys.stdout = original_stdout
+        if out_file:
+            try:
+                out_file.close()
+            except Exception:
+                pass
 
     queue.put(result)
 
@@ -353,13 +397,21 @@ class SandboxExecutor:
         tools: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute code in a worker process and return its result."""
+        import tempfile
+
         # MCP wrappers and caller-provided tools are available in the worker.
         merged_tools = {**self.tool_wrappers, **(tools or {})}
         result_queue: Queue[Any] = multiprocessing.Queue()
 
+        tmp_out = tempfile.NamedTemporaryFile(
+            delete=False, prefix="sandbox_out_", suffix=".log"
+        )
+        tmp_path = Path(tmp_out.name)
+        tmp_out.close()
+
         process = multiprocessing.Process(
             target=isolated_worker,
-            args=(code, self.config, result_queue, merged_tools),
+            args=(code, self.config, result_queue, merged_tools, str(tmp_path)),
         )
         process.start()
         process.join(timeout=self.config.max_execution_time_seconds)
@@ -367,10 +419,25 @@ class SandboxExecutor:
         if process.is_alive():
             process.terminate()
             process.join()
+            partial = ""
+            if tmp_path.exists():
+                try:
+                    partial = tmp_path.read_text(encoding="utf-8")
+                except Exception:
+                    pass
+                tmp_path.unlink(missing_ok=True)
+
             return {
                 "status": "error",
                 "error": "Sandbox Security: Execution timeout exceeded.",
+                "output": partial,
             }
+
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
         if not result_queue.empty():
             return cast(dict[str, Any], result_queue.get())
@@ -378,4 +445,5 @@ class SandboxExecutor:
         return {
             "status": "error",
             "error": "Unknown error: Process exited without returning data.",
+            "output": "",
         }
