@@ -84,6 +84,10 @@ def run_interactive_repl(executor: SandboxExecutor) -> None:
                 raw_error = result.get('error', '').strip()
                 error_line = raw_error.splitlines()[-1] if raw_error else "Unknown execution error"
                 print(f"Error: {error_line}", file=sys.stderr)
+                partial = result.get("output", "")
+                if partial:
+                    print(partial, end="" if partial.endswith("\n") else "\n")
+
             else:
                 out = result.get("output", "")
                 if out:
