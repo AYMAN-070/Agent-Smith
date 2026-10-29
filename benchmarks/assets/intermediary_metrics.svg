@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 360" width="100%" height="auto">
+  <rect width="850" height="360" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="30" y="38" font-family="sans-serif" font-size="18" font-weight="700" fill="#0f172a">Intermediary Behavioral Metrics Architecture (Section V.7)</text>
+  <text x="30" y="58" font-family="sans-serif" font-size="12" fill="#64748b">Measurement of agent reasoning lifecycle across Exploration, Convergence, and Submission Discipline</text>
+  <rect x="30" y="85" width="240" height="235" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <circle cx="60" cy="115" r="16" fill="#3b82f6"/>
+  <text x="60" y="120" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+  <text x="85" y="115" font-family="sans-serif" font-size="13" font-weight="700" fill="#1e3a8a">Exploration Efficiency</text>
+  <text x="85" y="130" font-family="sans-serif" font-size="10" font-weight="600" fill="#2563eb">METRIC 1</text>
+  <line x1="45" y1="145" x2="255" y2="145" stroke="#bfdbfe"/>
+  <text x="45" y="168" font-family="sans-serif" font-size="11" fill="#1e293b" font-weight="600">First Target Touch Step</text>
+  <text x="45" y="190" font-family="sans-serif" font-size="10" fill="#475569">Step where the agent first</text>
+  <text x="45" y="206" font-family="sans-serif" font-size="10" fill="#475569">locates and opens the file</text>
+  <text x="45" y="222" font-family="sans-serif" font-size="10" fill="#475569">modified in the final patch.</text>
+  <rect x="45" y="250" width="210" height="50" rx="6" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="55" y="270" font-family="sans-serif" font-size="10" font-weight="700" fill="#1d4ed8">Empirical Result:</text>
+  <text x="55" y="288" font-family="sans-serif" font-size="11" font-weight="700" fill="#15803d">🎯 Step 1 to 2 across all models</text>
+  <path d="M 275 200 L 295 200" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="305" y="85" width="240" height="235" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <circle cx="335" cy="115" r="16" fill="#10b981"/>
+  <text x="335" y="120" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+  <text x="360" y="115" font-family="sans-serif" font-size="13" font-weight="700" fill="#065f46">Test Convergence Step</text>
+  <text x="360" y="130" font-family="sans-serif" font-size="10" font-weight="600" fill="#059669">METRIC 2</text>
+  <line x1="320" y1="145" x2="530" y2="145" stroke="#bbf7d0"/>
+  <text x="320" y="168" font-family="sans-serif" font-size="11" fill="#1e293b" font-weight="600">Regression Pass Step</text>
+  <text x="320" y="190" font-family="sans-serif" font-size="10" fill="#475569">Iteration where unit tests</text>
+  <text x="320" y="206" font-family="sans-serif" font-size="10" fill="#475569">first pass completely green</text>
+  <text x="320" y="222" font-family="sans-serif" font-size="10" fill="#475569">inside the Docker sandbox.</text>
+  <rect x="320" y="250" width="210" height="50" rx="6" fill="#ffffff" stroke="#86efac"/>
+  <text x="330" y="270" font-family="sans-serif" font-size="10" font-weight="700" fill="#047857">Empirical Result:</text>
+  <text x="330" y="288" font-family="sans-serif" font-size="11" font-weight="700" fill="#15803d">🧪 Step 4 to 5 on successful runs</text>
+  <path d="M 550 200 L 570 200" stroke="#94a3b8" stroke-width="2"/>
+  <rect x="580" y="85" width="240" height="235" rx="8" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1.5"/>
+  <circle cx="610" cy="115" r="16" fill="#8b5cf6"/>
+  <text x="610" y="120" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+  <text x="635" y="115" font-family="sans-serif" font-size="13" font-weight="700" fill="#581c87">Submission Discipline</text>
+  <text x="635" y="130" font-family="sans-serif" font-size="10" font-weight="600" fill="#7c3aed">METRIC 3</text>
+  <line x1="595" y1="145" x2="805" y2="145" stroke="#e9d5ff"/>
+  <text x="595" y="168" font-family="sans-serif" font-size="11" fill="#1e293b" font-weight="600">Verification-to-Exit Lag</text>
+  <text x="595" y="190" font-family="sans-serif" font-size="10" fill="#475569">Iterations elapsed between</text>
+  <text x="595" y="206" font-family="sans-serif" font-size="10" fill="#475569">first passing test and final</text>
+  <text x="595" y="222" font-family="sans-serif" font-size="10" fill="#475569">answer call (0 is optimal).</text>
+  <rect x="595" y="250" width="210" height="50" rx="6" fill="#ffffff" stroke="#d8b4fe"/>
+  <text x="605" y="270" font-family="sans-serif" font-size="10" font-weight="700" fill="#6d28d9">Empirical Result:</text>
+  <text x="605" y="288" font-family="sans-serif" font-size="11" font-weight="700" fill="#15803d">🏁 0 to 1 step lag (Zero drift)</text>
+</svg>

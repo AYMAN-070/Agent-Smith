@@ -1,5 +1,7 @@
 """Module to inspect, clean, and truncate sandbox outputs."""
 
+from typing import Any
+
 
 class SandboxOutputHandler:
     """Handles inspection, cleaning, and truncation of sandbox outputs."""
@@ -118,4 +120,124 @@ class SandboxOutputHandler:
             "Your diff is verified and repository tests have already passed.\n"
             "Do NOT run further searches, edits, or tests.\n"
             "Submit your solution now using: final_answer(get_patch())"
+        )
+
+    @staticmethod
+    def get_no_code_feedback(benchmark: str = "mbpp") -> str:
+        """Build feedback when no Python code block was detected in model output."""
+        if benchmark == "mbpp":
+            return (
+                "Error: No executable Python code block was detected in your response.\n"
+                "You MUST wrap your Python code in ```python\n<code here>\n```.\n"
+                "If you have completed the solution, call final_answer(solution_code)."
+            )
+        return (
+            "Error: No executable Python code block detected.\n"
+            "Wrap your Python code in ```python\n<code here>\n```.\n"
+            "If you have completed the fix, call final_answer(get_patch())."
+        )
+
+    @classmethod
+    def get_mbpp_feedback(cls, code: str, sand_answer: dict[str, Any]) -> str:
+        """Analyze sandbox output for MBPP and return appropriate prompt feedback."""
+        status = sand_answer.get("status")
+        if status == "success":
+            raw_obs = sand_answer.get("output", "").strip()
+            observation = cls.clean_and_truncate(code, raw_obs)
+            print("\n👁️  [Observation Output]:")
+            print(observation if observation else "(No stdout output)")
+
+            if not observation:
+                return (
+                    "Warning: You defined a function but did NOT print "
+                    "any test results and did NOT call final_answer().\n"
+                    "To proceed, you MUST either test your function:\n"
+                    "  res = run_tests(candidate, tests)\n"
+                    "  print(res)\n"
+                    "Or call final_answer(solution_code) if you are sure it works."
+                )
+
+            if cls.is_test_run_finished(
+                code, observation, has_patch=True, benchmark="mbpp"
+            ):
+                print(
+                    "🎯 MBPP tests passed! Forcing agent to submit final_answer."
+                )
+                return (
+                    f"{observation}\n\n"
+                    "[CRITICAL NOTICE: ALL TESTS PASSED!]\n"
+                    "All assertions passed. You are done!\n"
+                    "Submit your final solution immediately: "
+                    "final_answer(solution_code)"
+                )
+
+            return observation
+
+        raw_error = (
+            sand_answer.get("error") or "Execution failed without details."
+        )
+        error_trace = cls.clean_and_truncate(code, raw_error)
+        print("\n" + "!" * 50)
+        print("❌ FAILED: Error detected in sandbox:")
+        print("-" * 50)
+        print(f"{error_trace}")
+        print("-" * 50)
+        print(
+            "🔄 Feeding code and error trace back to prompt for next iteration..."
+        )
+        print("!" * 50 + "\n")
+        return f"Execution Error:\n{error_trace}"
+
+    @classmethod
+    def get_swebench_feedback(
+        cls,
+        code: str,
+        sand_answer: dict[str, Any],
+        tests_passed: bool = False,
+        has_patch: bool = False,
+    ) -> tuple[str, bool]:
+        """Analyze sandbox output for SWE-bench and return (feedback, tests_passed)."""
+        status = sand_answer.get("status")
+        if status == "success":
+            raw_obs = sand_answer.get("output", "").strip()
+            observation = cls.clean_and_truncate(code, raw_obs)
+            print("\n👁️  [Observation Output]:")
+            print(observation if observation else "(No stdout output)")
+
+            if cls.is_test_run_finished(
+                code, observation, has_patch=has_patch, benchmark="swebench"
+            ):
+                print("🎯 Tests passed! Forcing agent to inspect and submit.")
+                return cls.build_test_success_feedback(observation), True
+
+            if (
+                tests_passed
+                and "get_patch" in code
+                and ("diff --git" in observation or "--- a/" in observation)
+            ):
+                print("🎯 Patch confirmed after tests! Forcing final_answer.")
+                return (
+                    cls.build_patch_confirmed_feedback(observation),
+                    tests_passed,
+                )
+
+            if not observation:
+                return (
+                    "Code executed successfully with no printed output.\n"
+                    "Remember to print() tool results, or verify changes "
+                    "with print(get_patch()).",
+                    tests_passed,
+                )
+
+            return observation, tests_passed
+
+        raw_error = sand_answer.get("error") or "Unknown execution error."
+        error_trace = cls.clean_and_truncate(code, raw_error)
+        print("\n" + "!" * 50)
+        print("❌ FAILED: Error detected in sandbox:")
+        print(f"{error_trace}")
+        print("!" * 50 + "\n")
+        return (
+            f"Execution error:\n{error_trace}\nFix your code and try again.",
+            tests_passed,
         )

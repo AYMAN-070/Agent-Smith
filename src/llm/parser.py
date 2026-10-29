@@ -78,7 +78,6 @@ class ResponseParser:
         return self._format_call(action, args)
 
     def output_sorting(self, llm_output: str) -> str:
-        # 1. Hermes / JSON tool calls
         hermes_pattern = r"<tool_call>\s*(.*?)\s*</tool_call>"
         match = re.search(
             hermes_pattern, llm_output, re.DOTALL | re.IGNORECASE
@@ -86,7 +85,6 @@ class ResponseParser:
         if match:
             return self.hermes(match.group(1).strip())
 
-        # 2. XML tool calls (Anthropic-style)
         xml_pattern = (
             r'<invoke\s+name=["\'](?P<name>[^"\']+)["\']>'
             r"(?P<params>.*?)</invoke>"
@@ -95,7 +93,6 @@ class ResponseParser:
         if match:
             return self.xml(match.group("name").strip(), match.group("params"))
 
-        # 3. ReAct format (Action: / Action Input:)
         react_pattern = (
             r"Action:\s*([a-zA-Z0-9_]+)\s*\nAction Input:\s*(.+?)"
             r"(?=\nAction:|\nObservation:|\nThought:|$)"
@@ -104,7 +101,6 @@ class ResponseParser:
         if match:
             return self.react(match.group(1).strip(), match.group(2).strip())
 
-        # 4. Blocs Python classiques (avec ``` ou <end_code>)
         py_pattern = r"```(?:python|py)?\s*\n(.*?)(?:```|<end_code>)"
         match = re.search(py_pattern, llm_output, re.DOTALL | re.IGNORECASE)
         if match:

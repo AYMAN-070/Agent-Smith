@@ -1,6 +1,7 @@
 """CLI entry point for running the MBPP agent."""
 
 import argparse
+import atexit
 import shlex
 import signal
 import sys
@@ -10,6 +11,7 @@ from typing import Any
 from src.agent.loop import MBPPAgentLoop
 from src.models import MBPPTaskInput
 from src.sandbox.executor import SandboxExecutor
+from src.rules import RulesMpbb
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -59,8 +61,10 @@ def main() -> None:
     args = parse_arguments()
     task_content = Path(args.task_file).read_text(encoding="utf-8")
     task = MBPPTaskInput.model_validate_json(task_content)
+    rules = RulesMpbb()
 
     sandbox = SandboxExecutor()
+    atexit.register(sandbox.close)
 
     def clean_exit(signum: int, frame: Any) -> None:
         """Handle termination signals and cleanup sandbox."""
@@ -70,6 +74,8 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, clean_exit)
     signal.signal(signal.SIGINT, clean_exit)
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, clean_exit)
 
     if args.mcp_server:
         sandbox.connect_mcp(server_url=args.mcp_server)
@@ -88,6 +94,7 @@ def main() -> None:
             output_path=args.output,
             model_name=args.model_name,
             provider_url=args.provider_url,
+            rules=rules,
         )
         agent.run()
     except Exception as err:
