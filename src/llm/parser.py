@@ -1,19 +1,30 @@
+"""Multi-format LLM output parser extracting executable code and tool calls."""
+
 import json
 import re
 from typing import Any
 
 
 class ResponseParser:
+    """Parses raw LLM completions across multiple formatting protocols.
+
+    Supports Hermes tool calls, XML invoke tags, ReAct action blocks,
+    standard Markdown code fences, and fallback extraction for unclosed/raw code.
+    """
+
     def __init__(self, llm_output: str) -> None:
+        """Initialize parser and extract code from raw LLM output text."""
         self.is_malformed: bool = False
         self.malformed_reason: str = ""
         self.code: str = self.output_sorting(llm_output)
 
     @classmethod
     def parse(cls, llm_output: str) -> str:
+        """Convenience class method to parse LLM text and return extracted code."""
         return cls(llm_output).code
 
     def _parse_val(self, val_str: str) -> Any:
+        """Parse parameter string value as JSON or return clean string."""
         clean_val = val_str.strip()
         try:
             return json.loads(clean_val)
@@ -21,6 +32,7 @@ class ResponseParser:
             return clean_val
 
     def _format_call(self, func_name: str, args: Any) -> str:
+        """Format function name and arguments dictionary into a valid Python call."""
         if isinstance(args, dict):
             args_str = ", ".join(f"{k}={repr(v)}" for k, v in args.items())
         else:
@@ -28,6 +40,7 @@ class ResponseParser:
         return f"{func_name}({args_str})"
 
     def hermes(self, raw_json: str) -> str:
+        """Parse Hermes format JSON tool call into executable Python function call."""
         try:
             data = json.loads(raw_json)
             func_name = data.get("name", "")
@@ -44,6 +57,7 @@ class ResponseParser:
         return ""
 
     def xml(self, name: str, params_str: str) -> str:
+        """Parse XML <invoke> tag format into executable Python function call."""
         args: dict[str, Any] = {}
         param_pattern = (
             r'<parameter(?:\s+name=["\'](?P<key>[^"\']+)["\'])?>'
@@ -70,6 +84,7 @@ class ResponseParser:
         return self._format_call(name, args)
 
     def react(self, action: str, raw_input: str) -> str:
+        """Parse ReAct Action/Action Input block into executable Python function call."""
         clean_input = re.sub(r"^```[a-zA-Z]*\n?|```$", "", raw_input).strip()
         try:
             args = json.loads(clean_input)
@@ -78,6 +93,7 @@ class ResponseParser:
         return self._format_call(action, args)
 
     def output_sorting(self, llm_output: str) -> str:
+        """Route and extract Python code across all supported output formats."""
         hermes_pattern = r"<tool_call>\s*(.*?)\s*</tool_call>"
         match = re.search(
             hermes_pattern, llm_output, re.DOTALL | re.IGNORECASE

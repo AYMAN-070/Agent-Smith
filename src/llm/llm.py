@@ -1,3 +1,5 @@
+"""LLM request handling and response parsing for Agent Smith."""
+
 import time
 from typing import Any
 
@@ -33,6 +35,7 @@ class LlmResponse:
         self.output_tokens: int = usage.get("completion_tokens", 0)
 
     def parse(self, llm_text: str) -> str:
+        """Parse raw LLM output and extract executable Python code."""
         return ResponseParser.parse(llm_text)
 
 
