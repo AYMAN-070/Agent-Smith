@@ -186,7 +186,7 @@ def apply_network_block() -> None:
         "fromfd",
     ):
         setattr(socket, attr, blocked_func)
-    socket.socket = BlockedSocket
+    setattr(socket, "socket", BlockedSocket)
 
     try:
         import _socket
@@ -198,7 +198,7 @@ def apply_network_block() -> None:
             "getnameinfo",
         ):
             setattr(_socket, attr, blocked_func)
-        _socket.socket = BlockedSocket
+        setattr(_socket, "socket", BlockedSocket)
     except (ImportError, AttributeError):
         pass
 
