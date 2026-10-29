@@ -79,7 +79,7 @@ class MCPClient:
 
     def _initialize(self) -> None:
         """Initialize the MCP session and query available tools, resources, and prompts."""
-        self._send_request(
+        init_res = self._send_request(
             "initialize",
             {
                 "protocolVersion": "2024-11-05",
@@ -90,15 +90,18 @@ class MCPClient:
                 },
             },
         )
+        capabilities = init_res.get("capabilities", {})
         self.list_tools()
-        try:
-            self.list_resources()
-        except Exception:
-            pass
-        try:
-            self.list_prompts()
-        except Exception:
-            pass
+        if "resources" in capabilities:
+            try:
+                self.list_resources()
+            except Exception:
+                pass
+        if "prompts" in capabilities:
+            try:
+                self.list_prompts()
+            except Exception:
+                pass
 
     def list_tools(self) -> list[dict[str, Any]]:
         """Query the MCP server for available tools."""
@@ -209,7 +212,7 @@ class HttpMCPClient:
 
     def start(self) -> None:
         """Initialize the HTTP MCP session."""
-        self._send_request(
+        init_res = self._send_request(
             "initialize",
             {
                 "protocolVersion": "2024-11-05",
@@ -220,15 +223,18 @@ class HttpMCPClient:
                 },
             },
         )
+        capabilities = init_res.get("capabilities", {})
         self.list_tools()
-        try:
-            self.list_resources()
-        except Exception:
-            pass
-        try:
-            self.list_prompts()
-        except Exception:
-            pass
+        if "resources" in capabilities:
+            try:
+                self.list_resources()
+            except Exception:
+                pass
+        if "prompts" in capabilities:
+            try:
+                self.list_prompts()
+            except Exception:
+                pass
 
     def list_tools(self) -> list[dict[str, Any]]:
         """Query the remote HTTP MCP server for available tools."""
