@@ -65,7 +65,14 @@ class MCPClient:
                 f"MCP server closed unexpectedly. Stderr: {err}"
             )
 
-        response = json.loads(response_line)
+        try:
+            response = json.loads(response_line)
+        except Exception as e:
+            err = self.process.stderr.read() if self.process.stderr else ""
+            raise RuntimeError(
+                f"Invalid JSON from MCP server ({e}): '{response_line.strip()}'. Stderr: {err}"
+            ) from e
+
         if "error" in response:
             raise RuntimeError(f"MCP Error: {response['error']}")
         return cast(dict[str, Any], response.get("result", {}))
@@ -188,12 +195,14 @@ class HttpMCPClient:
         }
         headers = {"Content-Type": "application/json"}
 
-        resp = requests.post(
-            self.server_url, json=payload, headers=headers, timeout=30
-        )
-        resp.raise_for_status()
-
-        data = resp.json()
+        try:
+            resp = requests.post(
+                self.server_url, json=payload, headers=headers, timeout=30
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            raise RuntimeError(f"MCP HTTP request failed: {e}") from e
         if "error" in data:
             raise RuntimeError(f"MCP HTTP Error: {data['error']}")
         return cast(dict[str, Any], data.get("result", {}))

@@ -12,7 +12,7 @@ from src.models import (
     StepMetrics,
     SWEBenchTaskInput,
 )
-from src.rules import RulesMpbb, RulesSwe
+from src.rules import RulesMbpp, RulesSwe
 from src.sandbox.executor import SandboxExecutor
 
 
@@ -22,13 +22,12 @@ class BaseAgentLoop:
     benchmark: str = ""
     failure_return_value: str = "didnt succeed"
     failure_solution_value: str = ""
-    timeout_margin: float = 10.0
 
     def __init__(
         self,
         task: MBPPTaskInput | SWEBenchTaskInput,
         sandbox: SandboxExecutor,
-        rules: RulesMpbb | RulesSwe,
+        rules: RulesMbpp | RulesSwe,
         output_path: str = "solution.json",
         model_name: str | None = None,
         provider_url: str | None = None,
@@ -72,9 +71,7 @@ class BaseAgentLoop:
         )
         return step_metric
 
-    def record_no_code_step(
-        self, llm: LlmResponse, step: int
-    ) -> StepMetrics:
+    def record_no_code_step(self, llm: LlmResponse, step: int) -> StepMetrics:
         """Record step metrics for an iteration where no code was generated."""
         sand_answer = {
             "status": "error",
@@ -119,10 +116,7 @@ class BaseAgentLoop:
 
         if start_time is not None:
             elapsed_time = time.time() - start_time
-            effective_timeout = max(
-                0.0, self.rules.timeout - self.timeout_margin
-            )
-            if elapsed_time > effective_timeout:
+            if elapsed_time > self.rules.timeout:
                 msg = f"Timeout exceeded: {elapsed_time:.2f}s > {self.rules.timeout}s"
                 print(f"⚠️ {msg}")
                 return msg
@@ -191,6 +185,20 @@ class BaseAgentLoop:
             solution_output.model_dump_json(indent=2), encoding="utf-8"
         )
         return solution_output
+
+    def _save_checkpoint(
+        self,
+        steps: list[StepMetrics],
+        start_time: float,
+    ) -> None:
+        """Save intermediate progress to solution.json after each iteration."""
+        self._save_solution(
+            status=False,
+            solution=self.failure_solution_value,
+            steps=steps,
+            total_time_seconds=time.time() - start_time,
+            error="Process interrupted or timed out before completion.",
+        )
 
     def _save_failure(
         self,
