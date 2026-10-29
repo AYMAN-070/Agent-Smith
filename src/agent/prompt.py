@@ -196,7 +196,8 @@ class SWEPromptBuilder:
             "7. To test, ALWAYS use `run_tests()`. NEVER run `pip install` or modify the environment (this will break package dependencies).\n"
             "8. Once your fix is verified, STOP and SUBMIT: inspect with `print(get_patch())` then call `final_answer(get_patch())`.\n"
             "   Do NOT look for new issues or attempt endless refactoring.\n"
-            "9. NEVER call final_answer and exploration/edit tools in the same script.\n\n"
+            "9. NEVER call final_answer and exploration/edit tools in the same script.\n"
+            "10. BREVITY IS MANDATORY: Output ONLY the minimal executable Python code block in ```python ... ``` without any natural language explanations, prose, or chatter.\n\n"
             "EXAMPLE - Investigating the repository:\n"
             "```python\n"
             "print(list_files('.', '*.py'))\n"
@@ -225,7 +226,7 @@ class SWEPromptBuilder:
                 {"role": "user", "content": user_content},
             ],
             "temperature": 0.2,
-            "max_tokens": 1500,
+            "max_tokens": 800,
             "top_p": 0.95,
         }
 

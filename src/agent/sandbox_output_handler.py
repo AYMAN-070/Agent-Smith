@@ -47,11 +47,17 @@ class SandboxOutputHandler:
         no_failure = (
             "failed" not in output_lower
             and "failures" not in output_lower
-            and "error" not in output_lower
+            and "error:" not in output_lower
+            and "traceback" not in output_lower
         )
-        has_passed = "passed" in output_lower or "pass" in output_lower
+        has_passed = (
+            "passed" in output_lower
+            or "\nok" in output_lower
+            or "ok (" in output_lower
+            or " 0 failures" in output_lower
+        )
 
-        return exit_zero and (has_passed or no_failure)
+        return exit_zero and no_failure and has_passed
 
     @staticmethod
     def clean_and_truncate(
