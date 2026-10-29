@@ -140,17 +140,20 @@ Agent-Smith/
 │   └── tasks/               # Standardized SWE-bench tasks (xarray, django, sympy)
 ├── src/
 │   ├── agent/               # Agent control loop, prompt builders, output sanitizers
-│   │   ├── loop.py          # Iterative Thought-Code-Observation loop
-│   │   ├── prompt.py        # System prompt builder with step budgets
-│   │   └── SandboxOutputHandler.py # Conda noise cleaner & observation truncator
+│   │   ├── base_loop.py     # Base agent loop with metrics and limit enforcement
+│   │   ├── loop.py          # Iterative Thought-Code-Observation loop (MBPP & SWE)
+│   │   ├── prompt.py        # System prompt builder with step budgets & Two-Phase rules
+│   │   └── sandbox_output_handler.py # Conda noise cleaner & observation truncator
 │   ├── docker_handler.py    # Docker container lifecycle manager
 │   ├── llm/                 # LLM API communication and response parsing
 │   │   ├── llm.py           # Request handler & token telemetry extraction
-│   │   ├── parser.py        # Markdown code block extractor
+│   │   ├── parser.py        # Multi-format parser (Hermes, XML, ReAct, Markdown)
 │   │   └── provider.py      # Multi-provider cascade (NVIDIA, Gemini, OpenRouter)
 │   ├── mcp/                 # MCP client (stdio & Streamable HTTP transport)
-│   │   └── client.py        # Dynamic tool discovery, resources, and prompts
+│   │   ├── client.py        # Dynamic tool discovery, resources, and prompts
+│   │   └── wrappers.py      # Dynamic tool wrapper generators
 │   ├── models.py            # Pydantic schemas (SolutionOutput, StepMetrics, etc.)
+│   ├── rules.py             # Resource limits and budget definitions
 │   └── sandbox/             # Security boundary & code executor
 │       ├── cli.py           # Interactive REPL interface
 │       ├── executor.py      # Child process runner, RLIMIT, network blocker
@@ -315,8 +318,26 @@ In compliance with **Section V.7 (Model Benchmark Report)** of the 42 curriculum
 - **Model Context Protocol (MCP) Specification** — Standardized tool and resource discovery protocol over JSON-RPC 2.0.
 - **Python Security & Sandboxing** — Linux kernel `setrlimit` documentation, standard library `multiprocessing`, and socket restriction primitives.
 
-### AI Usage Disclaimer
-As part of the 42 curriculum requirements, the scope and nature of artificial intelligence usage during this project is fully disclosed:
-- **Ideation & Architecture**: AI was used to discuss architectural trade-offs regarding sandbox process models, fallback cascade strategies, and MCP protocol mappings.
-- **Boilerplate & Typing**: AI assisted in drafting initial Pydantic schema validation structures (`models.py`) and refining strict Python typing annotations (`mypy --strict`).
-- **Development & Verification**: All kernel security primitives (`setrlimit`, `BlockedSocket`), command-line argument parsing, Docker container handling, and MCP implementations were reviewed, debugged, and verified manually by the authors. The core agent reasoning logic was tested iteratively against the official 42 evaluation moulinette.
+### AI Usage & Pedagogical Collaboration (Gemini)
+
+In accordance with 42 curriculum standards and the 42 AI Charter, the nature, extent, and methodology of Artificial Intelligence usage—primarily **Google Gemini**—during the conception, development, and debugging of Agent Smith is transparently detailed below:
+
+#### 1. Conceptual Mentorship & Architectural Research
+Gemini was leveraged extensively as an interactive tutor and pair-programming partner to build deep foundational understanding of modern agentic systems:
+- **Model Context Protocol (MCP)**: Deconstructing the JSON-RPC 2.0 protocol specifications, investigating transport mechanisms (bidirectional `stdio` pipes vs streaming `HTTP/SSE`), and understanding tool schema discovery (`tools/list` and `tools/call`).
+- **SWE-bench Execution Harness**: Analyzing how SWE-bench evaluates real-world repository bugs inside isolated Docker containers, how unified git diffs are generated, and how regression test suites (`/eval.sh`) validate patches.
+- **ReAct Control Loop**: Deepening understanding of the Thought $\to$ Action $\to$ Observation reasoning paradigm, preventing loop divergence, and designing robust agent termination conditions.
+
+#### 2. Technical Co-Design & Algorithmic Problem Solving
+Gemini acted as a sounding board to design and refine key technical challenges without relying on black-box third-party agent frameworks:
+- **Sandbox Process Model & Kernel Security**:
+  - Investigated how to enforce strict security using *only* Python standard libraries (avoiding forbidden libraries like `RestrictedPython`).
+  - Co-designed kernel resource constraints with `resource.setrlimit(resource.RLIMIT_AS)` to enforce virtual memory limits (512MB) and low-level monkeypatching of `socket` and `_socket` primitives to guarantee complete network isolation.
+  - Formulated the path traversal defense via canonical resolution (`Path.resolve().relative_to()`).
+- **AST Transformation for Interactive REPL (`transform_to_interactive_code`)**:
+  - Used Gemini to explore Python's `ast` module to automatically wrap unassigned top-level tool calls (e.g., `read_file(...)`) in `print(...)`, replicating an interactive Jupyter/IPython experience and preventing silent tool outputs.
+- **Observation Windowing & Token Budgeting**:
+  - Diagnosed quadratic token explosion caused by verbose pytest tracebacks (>25,000 characters).
+  - Designed the **Observation Windowing** heuristic in `SandboxOutputHandler` (retaining the 40-line header and 60-line traceback tail), cutting token consumption by over 50% and keeping execution safely below the 300k token ceiling.
+- **Container Lifecycle & Signal Trapping**:
+  - Co-designed robust Docker container management in `docker_handler.py` and `agent_swebench/__main__.py` using `atexit.register` and OS signal handlers (`SIGINT`, `SIGTERM`, `SIGHUP`) to ensure zero orphan containers remain on forced termination.

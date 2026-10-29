@@ -32,6 +32,7 @@ class BaseAgentLoop:
         model_name: str | None = None,
         provider_url: str | None = None,
     ) -> None:
+        """Initialize the base agent loop with task data, sandbox, rules, and LLM."""
         self.task = task
         self.sandbox = sandbox
         self.rules = rules
