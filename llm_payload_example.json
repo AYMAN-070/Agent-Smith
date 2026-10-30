@@ -1,32 +1,32 @@
 "contents": [
-    # 1. Ta demande initiale
+    # 1. Your initial request
     {
         "role": "user",
         "parts": [
             {
-                "text": "Écris la fonction maximum(a, b)..."
+                "text": "Write the function maximum(a, b)..."
             }
         ]
     },
 
-    # 2. La réponse (le code) que le LLM t'avait renvoyée
+    # 2. The response (the code) returned by the LLM
     {
         "role": "model",
         "parts": [
             {
-                "text": code_genere_par_le_llm
+                "text": code_generated_by_llm
             }
         ]
     },
 
-    # 3. Ton retour avec la trace d'erreur de la sandbox
+    # 3. Your feedback with the sandbox error traceback
     {
         "role": "user",
         "parts": [
             {
                 "text": (
-                "L'exécution a échoué dans la sandbox avec l'erreur suivante :\n"
-                f"{sandbox_error_traceback}\n\n""Corrige le code pour faire passer les tests."
+                "Execution failed in the sandbox with the following error:\n"
+                f"{sandbox_error_traceback}\n\n""Fix the code to make tests pass."
             )
             }
         ]

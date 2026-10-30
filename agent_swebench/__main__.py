@@ -85,6 +85,8 @@ def main() -> None:
 
         def clean_exit(signum: int, frame: Any) -> None:
             """Handle termination signals and cleanup container and sandbox."""
+            if signum == signal.SIGINT:
+                raise KeyboardInterrupt()
             print("\nKill signal received, cleaning in progress...")
             if docker_container:
                 docker_container.stop_and_remove()
@@ -118,8 +120,14 @@ def main() -> None:
             model_name=args.model_name,
             provider_url=args.provider_url,
             rules=rules,
+            docker_container=docker_container,
         )
         agent.run()
+    except KeyboardInterrupt:
+        print("\nAgent process interrupted by user (Ctrl+C).", file=sys.stderr)
+        sys.exit(130)
+    except SystemExit as err:
+        sys.exit(err.code if err.code is not None else 0)
     except Exception as err:
         print(f"\n{err}", file=sys.stderr)
         sys.exit(1)

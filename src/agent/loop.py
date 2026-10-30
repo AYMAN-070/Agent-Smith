@@ -1,6 +1,7 @@
 """Agent execution loops for MBPP and SWE-bench tasks."""
 
 import time
+from typing import Any
 
 from src.agent.base_loop import BaseAgentLoop
 from src.agent.prompt import PromptBuilder, SWEPromptBuilder
@@ -53,107 +54,111 @@ class MBPPAgentLoop(BaseAgentLoop):
         print("=" * 50)
         self._save_checkpoint(steps_metric, start_time)
 
-        while current_loop < max_loop:
-            step = current_loop + 1
-            print(f"\n--- [ITERATION {step}/{max_loop}] ---")
+        try:
+            while current_loop < max_loop:
+                step = current_loop + 1
+                print(f"\n--- [ITERATION {step}/{max_loop}] ---")
 
-            print("\n🤖 [1/3] Calling LLM with current prompt/history...")
-            try:
-                llm_response: LlmResponse = self.llm_request.generate_code(
-                    self.prompt
+                print("\n🤖 [1/3] Calling LLM with current prompt/history...")
+                try:
+                    llm_response: LlmResponse = self.llm_request.generate_code(
+                        self.prompt
+                    )
+                except Exception as err:
+                    print(f"❌ LLM generation error: {err}")
+                    return self._save_failure(
+                        steps_metric,
+                        start_time,
+                        error=f"LLM cascade failure: {err}",
+                    )
+                code_for_sandbox = llm_response.code
+                print("\n📥 [LLM Generated Code]:")
+                print(
+                    code_for_sandbox
+                    if code_for_sandbox
+                    else "(No Python code detected)"
                 )
-            except Exception as err:
-                print(f"❌ LLM generation error: {err}")
-                return self._save_failure(
-                    steps_metric,
-                    start_time,
-                    error=f"LLM cascade failure: {err}",
-                )
-            code_for_sandbox = llm_response.code
-            print("\n📥 [LLM Generated Code]:")
-            print(
-                code_for_sandbox
-                if code_for_sandbox
-                else "(No Python code detected)"
-            )
-            if not code_for_sandbox:
+                if not code_for_sandbox:
+                    steps_metric.append(
+                        self.handle_no_code(llm_response, step, max_loop)
+                    )
+                    current_loop += 1
+                    self._save_checkpoint(steps_metric, start_time)
+                    limit_error = self.limit_checker(steps_metric, start_time)
+                    if limit_error:
+                        return self._save_failure(
+                            steps_metric, start_time, limit_error
+                        )
+                    continue
+
+                print("⚙️  [2/3] Executing in Sandbox...")
+                sand_answer = self.sandbox.execute(code_for_sandbox)
+                print("\n📤 [Sandbox Result]:", sand_answer)
                 steps_metric.append(
-                    self.handle_no_code(llm_response, step, max_loop)
+                    self.record_step(
+                        llm_response, sand_answer, step, code_for_sandbox
+                    )
                 )
+
+                status = sand_answer.get("status")
+
+                # 1. Final answer submitted by the agent
+                if status == "final_answer":
+                    solution = sand_answer.get("answer")
+                    print("\n" + "=" * 50)
+                    print(
+                        f"✅ SUCCESS: Agent called"
+                        f" final_answer at iteration {step}!"
+                    )
+                    print(f"Final Solution:\n{solution}")
+                    print("=" * 50 + "\n")
+
+                    limit_error = self.limit_checker(
+                        steps_metric, start_time, is_final_answer=True
+                    )
+                    if limit_error:
+                        return self._save_failure(
+                            steps_metric, start_time, limit_error
+                        )
+
+                    self._save_solution(
+                        status=True,
+                        solution=str(solution),
+                        steps=steps_metric,
+                        total_time_seconds=time.time() - start_time,
+                    )
+                    return str(solution)
+
+                # 2. Process feedback and update prompt
+                feedback = SandboxOutputHandler.get_mbpp_feedback(
+                    code_for_sandbox, sand_answer
+                )
+                if llm_response.is_malformed:
+                    malformed_warn = (
+                        f"[WARNING: Code block was malformed: "
+                        f"{llm_response.malformed_reason}. "
+                        "Ensure future code is wrapped strictly in "
+                        "```python ... ```.]\n\n"
+                    )
+                    feedback = malformed_warn + feedback
+                self.prompt.add_model_response(
+                    f"```python\n{code_for_sandbox}\n```"
+                )
+                self.prompt.add_error_feedback(
+                    feedback, step=step, max_steps=max_loop
+                )
+
                 current_loop += 1
                 self._save_checkpoint(steps_metric, start_time)
+
                 limit_error = self.limit_checker(steps_metric, start_time)
                 if limit_error:
                     return self._save_failure(
                         steps_metric, start_time, limit_error
                     )
-                continue
-
-            print("⚙️  [2/3] Executing in Sandbox...")
-            sand_answer = self.sandbox.execute(code_for_sandbox)
-            print("\n📤 [Sandbox Result]:", sand_answer)
-            steps_metric.append(
-                self.record_step(
-                    llm_response, sand_answer, step, code_for_sandbox
-                )
-            )
-
-            status = sand_answer.get("status")
-
-            # 1. Final answer submitted by the agent
-            if status == "final_answer":
-                solution = sand_answer.get("answer")
-                print("\n" + "=" * 50)
-                print(
-                    f"✅ SUCCESS: Agent called"
-                    f" final_answer at iteration {step}!"
-                )
-                print(f"Final Solution:\n{solution}")
-                print("=" * 50 + "\n")
-
-                limit_error = self.limit_checker(
-                    steps_metric, start_time, is_final_answer=True
-                )
-                if limit_error:
-                    return self._save_failure(
-                        steps_metric, start_time, limit_error
-                    )
-
-                self._save_solution(
-                    status=True,
-                    solution=str(solution),
-                    steps=steps_metric,
-                    total_time_seconds=time.time() - start_time,
-                )
-                return str(solution)
-
-            # 2. Process feedback and update prompt
-            feedback = SandboxOutputHandler.get_mbpp_feedback(
-                code_for_sandbox, sand_answer
-            )
-            if llm_response.is_malformed:
-                malformed_warn = (
-                    f"[WARNING: Code block was malformed: "
-                    f"{llm_response.malformed_reason}. "
-                    "Ensure future code is wrapped strictly in "
-                    "```python ... ```.]\n\n"
-                )
-                feedback = malformed_warn + feedback
-            self.prompt.add_model_response(
-                f"```python\n{code_for_sandbox}\n```"
-            )
-            self.prompt.add_error_feedback(
-                feedback, step=step, max_steps=max_loop
-            )
-
-            current_loop += 1
-            self._save_checkpoint(steps_metric, start_time)
-
-            limit_error = self.limit_checker(steps_metric, start_time)
-            if limit_error:
-                return self._save_failure(
-                    steps_metric, start_time, limit_error
-                )
+        except (KeyboardInterrupt, SystemExit) as exc:
+            self.handle_shutdown(exc, steps_metric, start_time)
+            raise
 
         return self._save_failure(
             steps_metric,
@@ -177,6 +182,7 @@ class SWEAgentLoop(BaseAgentLoop):
         output_path: str = "solution.json",
         model_name: str | None = None,
         provider_url: str | None = None,
+        docker_container: Any = None,
     ) -> None:
         """Initializes the loop for the Software Engineering Agent."""
         super().__init__(
@@ -191,6 +197,22 @@ class SWEAgentLoop(BaseAgentLoop):
         self.prompt = SWEPromptBuilder(
             self.issue_description, tools_manual=sandbox.tools
         )
+        self.docker_container = docker_container
+
+    def handle_shutdown(
+        self,
+        exc: BaseException,
+        steps_metric: list[StepMetrics],
+        start_time: float,
+    ) -> None:
+        """Perform proper shutdown including Docker container cleanup."""
+        super().handle_shutdown(exc, steps_metric, start_time)
+        if self.docker_container:
+            print("🧹 Cleaning up Docker container on shutdown...")
+            try:
+                self.docker_container.stop_and_remove()
+            except Exception as e:
+                print(f"Error removing container during shutdown: {e}")
 
     def run(self) -> str:
         """Execute the iterative loop to resolve the SWE-bench issue."""
@@ -204,126 +226,130 @@ class SWEAgentLoop(BaseAgentLoop):
         print("=" * 50)
         self._save_checkpoint(steps_metric, start_time)
 
-        while current_loop < max_loop:
-            step = current_loop + 1
-            print(f"\n--- [SWE ITERATION {step}/{max_loop}] ---")
+        try:
+            while current_loop < max_loop:
+                step = current_loop + 1
+                print(f"\n--- [SWE ITERATION {step}/{max_loop}] ---")
 
-            print("\n🤖 [1/3] Calling LLM with current prompt/history...")
-            try:
-                llm_response = self.llm_request.generate_code(self.prompt)
-            except Exception as err:
-                print(f"❌ LLM generation error: {err}")
-                return self._save_failure(
-                    steps_metric,
-                    start_time,
-                    error=f"LLM cascade failure: {err}",
+                print("\n🤖 [1/3] Calling LLM with current prompt/history...")
+                try:
+                    llm_response = self.llm_request.generate_code(self.prompt)
+                except Exception as err:
+                    print(f"❌ LLM generation error: {err}")
+                    return self._save_failure(
+                        steps_metric,
+                        start_time,
+                        error=f"LLM cascade failure: {err}",
+                    )
+                code_for_sandbox = llm_response.code
+                print("\n📥 [LLM Generated Code]:")
+                print(
+                    code_for_sandbox
+                    if code_for_sandbox
+                    else "(No Python code detected)"
                 )
-            code_for_sandbox = llm_response.code
-            print("\n📥 [LLM Generated Code]:")
-            print(
-                code_for_sandbox
-                if code_for_sandbox
-                else "(No Python code detected)"
-            )
-            if not code_for_sandbox:
+                if not code_for_sandbox:
+                    steps_metric.append(
+                        self.handle_no_code(llm_response, step, max_loop)
+                    )
+                    current_loop += 1
+                    self._save_checkpoint(steps_metric, start_time)
+                    limit_error = self.limit_checker(steps_metric, start_time)
+                    if limit_error:
+                        return self._save_failure(
+                            steps_metric, start_time, limit_error
+                        )
+                    continue
+
+                print("⚙️  [2/3] Executing in Sandbox...")
+                sand_answer = self.sandbox.execute(code_for_sandbox)
+                print("\n📤 [Sandbox Result]:", sand_answer)
                 steps_metric.append(
-                    self.handle_no_code(llm_response, step, max_loop)
+                    self.record_step(
+                        llm_response, sand_answer, step, code_for_sandbox
+                    )
                 )
+
+                status = sand_answer.get("status")
+
+                # 1. Final answer submitted by the agent
+                if status == "final_answer":
+                    solution = sand_answer.get("answer", "")
+                    print("\n" + "=" * 50)
+                    print(
+                        f"✅ SUCCESS: Agent called final_answer "
+                        f"at iteration {step}!"
+                    )
+                    print(f"Final Solution:\n{solution}")
+                    print("=" * 50 + "\n")
+
+                    # Fallback: if solution is not a git patch, attempt get_patch
+                    patch_markers = ["diff --git", "--- a/", "+++ b/", "@@"]
+                    if not solution or not any(
+                        m in str(solution) for m in patch_markers
+                    ):
+                        patch_res = self.sandbox.execute("print(get_patch())")
+                        if patch_res.get("status") == "success" and patch_res.get(
+                            "output"
+                        ):
+                            candidate_patch = patch_res["output"].strip()
+                            if any(m in candidate_patch for m in patch_markers):
+                                solution = candidate_patch
+
+                    limit_error = self.limit_checker(
+                        steps_metric, start_time, is_final_answer=True
+                    )
+                    if limit_error:
+                        return self._save_failure(
+                            steps_metric, start_time, limit_error
+                        )
+
+                    self._save_solution(
+                        status=True,
+                        solution=str(solution),
+                        steps=steps_metric,
+                        total_time_seconds=time.time() - start_time,
+                    )
+                    return str(solution)
+
+                # 2. Process feedback and update prompt
+                if "edit_file" in code_for_sandbox:
+                    tests_passed = False
+
+                has_patch = False
+                if "run_tests" in code_for_sandbox:
+                    patch_res = self.sandbox.execute("print(get_patch())")
+                    has_patch = bool(patch_res.get("output", "").strip())
+
+                feedback, tests_passed = (
+                    SandboxOutputHandler.get_swebench_feedback(
+                        code_for_sandbox, sand_answer, tests_passed, has_patch
+                    )
+                )
+                if llm_response.is_malformed:
+                    malformed_warn = (
+                        f"[WARNING: Code block was malformed: "
+                        f"{llm_response.malformed_reason}. "
+                        "Ensure future code is wrapped strictly in "
+                        "```python ... ```.]\n\n"
+                    )
+                    feedback = malformed_warn + feedback
+                self.prompt.add_model_response(
+                    f"```python\n{code_for_sandbox}\n```"
+                )
+                self.prompt.add_feedback(feedback, step=step, max_steps=max_loop)
+
                 current_loop += 1
                 self._save_checkpoint(steps_metric, start_time)
+
                 limit_error = self.limit_checker(steps_metric, start_time)
                 if limit_error:
                     return self._save_failure(
                         steps_metric, start_time, limit_error
                     )
-                continue
-
-            print("⚙️  [2/3] Executing in Sandbox...")
-            sand_answer = self.sandbox.execute(code_for_sandbox)
-            print("\n📤 [Sandbox Result]:", sand_answer)
-            steps_metric.append(
-                self.record_step(
-                    llm_response, sand_answer, step, code_for_sandbox
-                )
-            )
-
-            status = sand_answer.get("status")
-
-            # 1. Final answer submitted by the agent
-            if status == "final_answer":
-                solution = sand_answer.get("answer", "")
-                print("\n" + "=" * 50)
-                print(
-                    f"✅ SUCCESS: Agent called final_answer "
-                    f"at iteration {step}!"
-                )
-                print(f"Final Solution:\n{solution}")
-                print("=" * 50 + "\n")
-
-                # Fallback: if solution is not a git patch, attempt get_patch
-                patch_markers = ["diff --git", "--- a/", "+++ b/", "@@"]
-                if not solution or not any(
-                    m in str(solution) for m in patch_markers
-                ):
-                    patch_res = self.sandbox.execute("print(get_patch())")
-                    if patch_res.get("status") == "success" and patch_res.get(
-                        "output"
-                    ):
-                        candidate_patch = patch_res["output"].strip()
-                        if any(m in candidate_patch for m in patch_markers):
-                            solution = candidate_patch
-
-                limit_error = self.limit_checker(
-                    steps_metric, start_time, is_final_answer=True
-                )
-                if limit_error:
-                    return self._save_failure(
-                        steps_metric, start_time, limit_error
-                    )
-
-                self._save_solution(
-                    status=True,
-                    solution=str(solution),
-                    steps=steps_metric,
-                    total_time_seconds=time.time() - start_time,
-                )
-                return str(solution)
-
-            # 2. Process feedback and update prompt
-            if "edit_file" in code_for_sandbox:
-                tests_passed = False
-
-            has_patch = False
-            if "run_tests" in code_for_sandbox:
-                patch_res = self.sandbox.execute("print(get_patch())")
-                has_patch = bool(patch_res.get("output", "").strip())
-
-            feedback, tests_passed = (
-                SandboxOutputHandler.get_swebench_feedback(
-                    code_for_sandbox, sand_answer, tests_passed, has_patch
-                )
-            )
-            if llm_response.is_malformed:
-                malformed_warn = (
-                    f"[WARNING: Code block was malformed: "
-                    f"{llm_response.malformed_reason}. "
-                    "Ensure future code is wrapped strictly in "
-                    "```python ... ```.]\n\n"
-                )
-                feedback = malformed_warn + feedback
-            self.prompt.add_model_response(
-                f"```python\n{code_for_sandbox}\n```"
-            )
-            self.prompt.add_feedback(feedback, step=step, max_steps=max_loop)
-
-            current_loop += 1
-            self._save_checkpoint(steps_metric, start_time)
-
-            limit_error = self.limit_checker(steps_metric, start_time)
-            if limit_error:
-                return self._save_failure(
-                    steps_metric, start_time, limit_error
-                )
+        except (KeyboardInterrupt, SystemExit) as exc:
+            self.handle_shutdown(exc, steps_metric, start_time)
+            raise
 
         return self._save_failure(
             steps_metric,

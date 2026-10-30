@@ -21,4 +21,3 @@ class RulesSwe:
         self.input_tokens = 300000
         self.output_tokens = 10000
         self.timeout = 900
-
