@@ -10,7 +10,7 @@ try:
     from mcp.server.fastmcp import FastMCP
 except ImportError:
     try:
-        from fastmcp import FastMCP
+        from fastmcp import FastMCP  # type: ignore[no-redef,import-not-found]
     except Exception as err:
         print(f"Error importing FastMCP: {err}", file=sys.stderr)
         sys.exit(1)
@@ -379,7 +379,7 @@ def search_function_or_class_definition_in_code(name: str) -> str:
       - name: Exact function or class name to locate.
     """
     pattern = rf"^\s*(?:async\s+def|def|class)\s+{re.escape(name)}\b"
-    return search_code(pattern=pattern, file_pattern="*.py")
+    return str(search_code(pattern=pattern, file_pattern="*.py"))
 
 
 @mcp.tool()
@@ -690,7 +690,7 @@ if __name__ == "__main__":
             CONTAINER_ID = args.container_id
 
         if args.transport in ("sse", "streamable-http"):
-            mcp.run(transport=args.transport, port=args.port)
+            getattr(mcp, "run")(transport=args.transport, port=args.port)
         else:
             mcp.run(transport="stdio")
     except Exception as err:

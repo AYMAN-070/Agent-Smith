@@ -1,9 +1,43 @@
 """MCP client implementations over stdio and HTTP."""
 
 import json
+import os
 import shlex
+import shutil
 import subprocess
+import sys
 from typing import Any, cast
+
+
+def _parse_command(command: str) -> list[str]:
+    """Parse command line string into argument list, handling unquoted paths with spaces."""
+    raw_args = shlex.split(command)
+    if not raw_args:
+        return []
+
+    if raw_args[0] == "python" and not shutil.which("python"):
+        raw_args[0] = sys.executable
+
+    args: list[str] = []
+    i = 0
+    while i < len(raw_args):
+        if not os.path.exists(raw_args[i]) and not raw_args[i].startswith("-"):
+            found = False
+            for j in range(len(raw_args), i, -1):
+                joined = " ".join(raw_args[i:j])
+                if os.path.exists(joined):
+                    args.append(joined)
+                    i = j
+                    found = True
+                    break
+            if not found:
+                args.append(raw_args[i])
+                i += 1
+        else:
+            args.append(raw_args[i])
+            i += 1
+
+    return args
 
 
 class MCPClient:
@@ -20,7 +54,7 @@ class MCPClient:
 
     def start(self) -> None:
         """Start the MCP server subprocess."""
-        args = shlex.split(self.command)
+        args = _parse_command(self.command)
         self.process = subprocess.Popen(
             args,
             stdin=subprocess.PIPE,
