@@ -187,7 +187,9 @@ class BaseAgentLoop:
             total_time_seconds=total_time_seconds,
             error=error,
         )
-        Path(self.output_path).write_text(
+        out_path = Path(self.output_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(
             solution_output.model_dump_json(indent=2), encoding="utf-8"
         )
         return solution_output
