@@ -2,28 +2,6 @@
 # ABOUTME: The moulinette does NOT run student code, except run-agent which enforces a hard timeout on it.
 import json
 import os
-from pathlib import Path
-
-
-def _init_docker_env() -> None:
-    """Auto-detect Docker rootless socket on 42 school / unprivileged machines."""
-    if "DOCKER_HOST" not in os.environ:
-        try:
-            uid = os.getuid()
-            user_sock = Path(f"/run/user/{uid}/docker.sock")
-            xdg_runtime = os.environ.get("XDG_RUNTIME_DIR")
-            xdg_sock = Path(xdg_runtime) / "docker.sock" if xdg_runtime else None
-
-            if user_sock.exists():
-                os.environ["DOCKER_HOST"] = f"unix://{user_sock}"
-            elif xdg_sock and xdg_sock.exists():
-                os.environ["DOCKER_HOST"] = f"unix://{xdg_sock}"
-        except Exception:
-            pass
-
-
-_init_docker_env()
-
 import random
 import shlex
 import signal
@@ -92,126 +70,6 @@ SWEBENCH_EXAM_POOL = EXAM_POOL
 SWEBENCH_EVAL_TIMEOUT_SECONDS = 900
 
 
-def _validate_swebench_patch_cli(sb: InteractSweBench, instance_id: str, patch: str) -> bool:
-    """Fallback validation using Docker CLI when Docker Python SDK lacks socket permissions."""
-    import uuid
-    from pathlib import Path
-    from swebench.harness.grading import (
-        get_eval_tests_report,
-        get_resolution_status,
-        get_logs_eval,
-    )
-    from swebench.harness.constants import (
-        ResolvedStatus,
-        EvalType,
-        FAIL_ONLY_REPOS,
-        KEY_INSTANCE_ID,
-        FAIL_TO_PASS,
-        PASS_TO_PASS,
-        START_TEST_OUTPUT,
-        END_TEST_OUTPUT,
-    )
-
-    img = sb._image_name(instance_id)
-    container_name = f"moulinette_eval_{uuid.uuid4().hex[:8]}"
-
-    print(f"Starting Docker container {container_name} via CLI for {img}...")
-    subprocess.run(["docker", "pull", img], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    run_res = subprocess.run(
-        ["docker", "run", "-d", "--rm", "--name", container_name, img, "tail", "-f", "/dev/null"],
-        capture_output=True,
-        text=True,
-    )
-    if run_res.returncode != 0:
-        print(f"Failed to start container via CLI: {run_res.stderr}")
-        return False
-
-    try:
-        # 1. Apply patch
-        patch_apply = subprocess.run(
-            ["docker", "exec", "-i", "-w", "/testbed", container_name, "git", "apply", "-v"],
-            input=patch,
-            text=True,
-            capture_output=True,
-        )
-        if patch_apply.returncode == 0:
-            print("Patch applied successfully via git apply")
-        else:
-            patch_apply2 = subprocess.run(
-                ["docker", "exec", "-i", "-w", "/testbed", container_name, "git", "apply", "-v", "--reject"],
-                input=patch,
-                text=True,
-                capture_output=True,
-            )
-            if patch_apply2.returncode == 0:
-                print("Patch applied via git apply --reject")
-            else:
-                print(f"Warning: git apply failed: {patch_apply.stderr}")
-
-        # 2. Get eval script and inject
-        eval_script = sb._get_eval_script(instance_id)
-        subprocess.run(
-            ["docker", "exec", "-i", container_name, "sh", "-c", "cat > /eval.sh"],
-            input=eval_script,
-            text=True,
-            check=True,
-            stdout=subprocess.DEVNULL,
-        )
-        subprocess.run(
-            ["docker", "exec", container_name, "chmod", "+x", "/eval.sh"],
-            check=True,
-        )
-
-        # 3. Execute /eval.sh with timeout
-        print(f"Executing eval script inside container (timeout: {SWEBENCH_EVAL_TIMEOUT_SECONDS}s)...")
-        test_run = subprocess.run(
-            ["docker", "exec", container_name, "/bin/bash", "/eval.sh"],
-            capture_output=True,
-            text=True,
-            timeout=SWEBENCH_EVAL_TIMEOUT_SECONDS,
-        )
-        out = test_run.stdout + "\n" + test_run.stderr
-        print(out)
-
-        # 4. Grade test results
-        test_spec = sb._get_test_spec(instance_id)
-        log_file = Path("/tmp/test_output.txt")
-        log_file.write_text(out, encoding="utf-8")
-
-        eval_status_map, found = get_logs_eval(test_spec, str(log_file))
-        if not found:
-            print("Failed to parse test output or tests did not run")
-            return False
-
-        if START_TEST_OUTPUT not in out or END_TEST_OUTPUT not in out:
-            print("Test output markers not found")
-            return False
-
-        eval_ref = {
-            KEY_INSTANCE_ID: test_spec.instance_id,
-            FAIL_TO_PASS: test_spec.FAIL_TO_PASS,
-            PASS_TO_PASS: test_spec.PASS_TO_PASS,
-        }
-        eval_type = (
-            EvalType.FAIL_ONLY
-            if test_spec.repo in FAIL_ONLY_REPOS
-            else EvalType.PASS_AND_FAIL
-        )
-        report = get_eval_tests_report(eval_status_map, eval_ref, eval_type=eval_type)
-        resolution_status = get_resolution_status(report)
-        passed = (resolution_status == ResolvedStatus.FULL.value)
-        print(f"Resolution status: {resolution_status}")
-        print(f"Evaluation passed: {passed}")
-        return passed
-
-    except Exception as e:
-        print(f"Error during CLI evaluation: {e}")
-        return False
-    finally:
-        subprocess.run(["docker", "rm", "-f", container_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print(f"Cleaned up container {container_name}")
-
-
 def _validate_swebench_patch(sb: InteractSweBench, instance_id: str, patch: str) -> bool:
     """Validate a SWE-bench patch by running the evaluation script.
 
@@ -231,8 +89,8 @@ def _validate_swebench_patch(sb: InteractSweBench, instance_id: str, patch: str)
             timeout=SWEBENCH_EVAL_TIMEOUT_SECONDS,
         )
     except Exception as e:
-        print(f"Docker SDK connection failed ({e}). Falling back to Docker CLI...")
-        return _validate_swebench_patch_cli(sb, instance_id, patch)
+        print(f"Error validating solution: {e}")
+        return False
 
 
 def _get_limits(benchmark: str) -> MetricsLimits:

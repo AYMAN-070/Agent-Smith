@@ -2,10 +2,6 @@
 # Runs dump -> run-agent -> validate for one task. Usage: ./quickstart.sh mbpp|swebench [options]
 set -e
 
-if [ -z "$DOCKER_HOST" ] && [ -S "/run/user/$(id -u)/docker.sock" ]; then
-    export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
-fi
-
 BENCHMARK="${1:-}"
 shift || true
 
@@ -79,8 +75,7 @@ uv run moulinette_eval dump "$BENCHMARK" $DUMP_ARGS --output "$TASK_FILE"
 echo ""
 echo "--- 2/3 run your agent (timeout ${TIME_LIMIT}s) ---"
 cd "$STUDENT_PATH"
-unset VIRTUAL_ENV
-AGENT_CMD="uv run python -m agent_$BENCHMARK --task-file '$TASK_FILE' --output '$SOLUTION_FILE' $MODEL_ARGS"
+AGENT_CMD="uv run python -m agent_$BENCHMARK --task-file $TASK_FILE --output $SOLUTION_FILE $MODEL_ARGS"
 uv run --project "$SCRIPT_DIR" moulinette_eval run-agent "$TIME_LIMIT" "$AGENT_CMD"
 
 echo ""
