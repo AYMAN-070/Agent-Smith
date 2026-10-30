@@ -82,6 +82,8 @@ def main() -> None:
 
         def clean_exit(signum: int, frame: Any) -> None:
             """Handle termination signals and cleanup sandbox."""
+            if signum == signal.SIGINT:
+                raise KeyboardInterrupt()
             print("\nKill signal received, cleaning in progress...")
             if sandbox:
                 sandbox.close()
@@ -111,6 +113,11 @@ def main() -> None:
             rules=rules,
         )
         agent.run()
+    except KeyboardInterrupt:
+        print("\nAgent process interrupted by user (Ctrl+C).", file=sys.stderr)
+        sys.exit(130)
+    except SystemExit as err:
+        sys.exit(err.code if err.code is not None else 0)
     except Exception as err:
         print(f"\n{err}", file=sys.stderr)
         sys.exit(1)

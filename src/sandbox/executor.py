@@ -59,6 +59,8 @@ SAFE_BUILTINS: dict[str, Any] = {
     "ImportError": ImportError,
     "PermissionError": PermissionError,
     "FileNotFoundError": FileNotFoundError,
+    "exit": sys.exit,
+    "quit": sys.exit,
     "ValueError": ValueError,
     "TypeError": TypeError,
     "KeyError": KeyError,
@@ -303,7 +305,7 @@ def isolated_worker(
         executable_code = transform_to_interactive_code(code)
         exec(executable_code, safe_env)
 
-        result = {
+        result: dict[str, Any] = {
             "status": "success",
             "output": get_captured_output(),
         }
@@ -314,10 +316,17 @@ def isolated_worker(
             "answer": error.answer,
             "output": get_captured_output(),
         }
-    except (KeyboardInterrupt, SystemExit) as error:
+    except KeyboardInterrupt:
         result = {
-            "status": "fatal_interrupt",
-            "error_type": type(error).__name__,
+            "status": "keyboard_interrupt",
+            "output": get_captured_output(),
+        }
+    except SystemExit as error:
+        result = {
+            "status": "system_exit",
+            "code": error.code,
+            "output": get_captured_output(),
+        }
             "output": get_captured_output(),
         }
     except Exception as error:
@@ -347,6 +356,7 @@ class SandboxExecutor:
         self.tool_wrappers: dict[str, Any] = {}
         self.mcp_client: Any = None
         self.tools = self.get_tools_manual()
+        self._current_process: multiprocessing.Process | None = None
 
     def connect_mcp(
         self,
@@ -381,7 +391,14 @@ class SandboxExecutor:
         return generate_tools_manual(mcp_tools)
 
     def close(self) -> None:
-        """Stop the MCP client if one is connected."""
+        """Stop the MCP client and terminate any running worker process."""
+        if self._current_process and self._current_process.is_alive():
+            try:
+                self._current_process.terminate()
+                self._current_process.join(timeout=1)
+            except Exception:
+                pass
+            self._current_process = None
         if self.mcp_client:
             self.mcp_client.stop()
             self.mcp_client = None
@@ -392,6 +409,7 @@ class SandboxExecutor:
         tools: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute code in a worker process and return its result."""
+        import signal
         import tempfile
 
         # MCP wrappers and caller-provided tools are available in the worker.
@@ -408,8 +426,20 @@ class SandboxExecutor:
             target=isolated_worker,
             args=(code, self.config, result_queue, merged_tools, str(tmp_path)),
         )
-        process.start()
-        process.join(timeout=self.config.max_execution_time_seconds)
+        self._current_process = process
+
+        try:
+            process.start()
+            process.join(timeout=self.config.max_execution_time_seconds)
+        except KeyboardInterrupt:
+            if process.is_alive():
+                process.terminate()
+                process.join()
+            tmp_path.unlink(missing_ok=True)
+            self._current_process = None
+            raise
+        finally:
+            self._current_process = None
 
         if process.is_alive():
             process.terminate()
@@ -436,12 +466,16 @@ class SandboxExecutor:
 
         if not result_queue.empty():
             res = cast(dict[str, Any], result_queue.get())
-            if res.get("status") == "fatal_interrupt":
-                if res["error_type"] == "KeyboardInterrupt":
-                    raise KeyboardInterrupt("Interruption from sandbox")
-                elif res["error_type"] == "SystemExit":
-                    raise SystemExit("SystemExit from sandbox")
+            status = res.get("status")
+            if status == "keyboard_interrupt":
+                raise KeyboardInterrupt()
+            if status == "system_exit":
+                code_val = res.get("code")
+                raise SystemExit(code_val)
             return res
+
+        if process.exitcode in (-signal.SIGINT, 130):
+            raise KeyboardInterrupt()
 
         return {
             "status": "error",

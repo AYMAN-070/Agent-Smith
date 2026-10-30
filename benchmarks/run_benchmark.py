@@ -209,7 +209,9 @@ def is_solution_passed(data: dict[str, Any]) -> bool:
     """Determine if a run succeeded based on test execution and patch generation."""
     success = bool(data.get("success", False))
     patch = str(data.get("solution", "")).strip()
-    return success and bool(patch) and ("diff --git" in patch or "---" in patch)
+    return (
+        success and bool(patch) and ("diff --git" in patch or "---" in patch)
+    )
 
 
 def check_model_availability(model: dict[str, str]) -> bool:
@@ -234,12 +236,12 @@ def execute_run(
 ) -> None:
     """Execute a single model x task SWE-bench agent run."""
     task_path = TASKS_DIR / task["file"]
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(
         f"🚀 Running: [{model['provider_name']}] {model['name']} on {task['task_id']}"
     )
     print(f"Output: {output_path}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     cmd = [
         sys.executable,
@@ -309,7 +311,9 @@ def analyze_run(
             first_touch_step = step_num
 
         if first_pass_step is None and (
-            "PASSED" in s_out or "All tests passed" in s_out or "1 passed" in s_out
+            "PASSED" in s_out
+            or "All tests passed" in s_out
+            or "1 passed" in s_out
         ):
             first_pass_step = step_num
             test_convergence_step = step_num
@@ -323,7 +327,9 @@ def analyze_run(
 
     # Cost estimation
     in_rate, out_rate = MODEL_COSTS.get(model["name"], (0.10, 0.30))
-    cost = (total_in / 1_000_000.0) * in_rate + (total_out / 1_000_000.0) * out_rate
+    cost = (total_in / 1_000_000.0) * in_rate + (
+        total_out / 1_000_000.0
+    ) * out_rate
 
     return {
         "model_name": model["name"],
@@ -350,7 +356,9 @@ def analyze_run(
 def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     """Generate the official BENCHMARK_REPORT.md at repository root."""
     lines: list[str] = []
-    lines.append("# Comprehensive SWE-bench Multi-Model Evaluation: Agent Smith")
+    lines.append(
+        "# Comprehensive SWE-bench Multi-Model Evaluation: Agent Smith"
+    )
     lines.append("")
     lines.append(
         "> Multi-model evaluation across SWE-bench tasks in compliance with 42 Curriculum (Section V.7)."
@@ -363,7 +371,9 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
 
     total_runs = len(results)
     passed_runs = sum(1 for r in results if r["passed"])
-    overall_solve_rate = round((passed_runs / total_runs) * 100, 1) if total_runs else 0.0
+    overall_solve_rate = (
+        round((passed_runs / total_runs) * 100, 1) if total_runs else 0.0
+    )
 
     lines.append("### Executive Summary")
     lines.append(
@@ -441,9 +451,13 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
         total_m_runs = len(runs)
         pass_m_runs = sum(1 for run in runs if run["passed"])
         m_rate = round((pass_m_runs / total_m_runs) * 100, 1)
-        avg_lat = round(sum(run["avg_latency_s"] for run in runs) / total_m_runs, 2)
+        avg_lat = round(
+            sum(run["avg_latency_s"] for run in runs) / total_m_runs, 2
+        )
         total_ret = sum(run["retries"] for run in runs)
-        avail = "100.0%" if total_ret == 0 else f"{round(100 - total_ret*2, 1)}%"
+        avail = (
+            "100.0%" if total_ret == 0 else f"{round(100 - total_ret * 2, 1)}%"
+        )
         p_name = runs[0]["provider_name"]
         lines.append(
             f"| `{m_name}` ({p_name}) | {total_m_runs} | {m_rate}% ({pass_m_runs}/{total_m_runs}) | {avg_lat}s | {total_ret} | {avail} |"
@@ -480,7 +494,9 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     lines.append("## 5. Triple Systematic Ablation Studies")
     lines.append("")
 
-    lines.append("### Ablation 1: Observation Windowing vs Unbounded Tool Output")
+    lines.append(
+        "### Ablation 1: Observation Windowing vs Unbounded Tool Output"
+    )
     lines.append(
         "When executing extensive test suites (`run_tests()`), pytest traceback logs frequently exceed 25,000 characters. "
         "Without observation windowing, cumulative input tokens scale quadratically, quickly breaching the 300,000 token limit."
@@ -490,11 +506,17 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
         "| Configuration | Max Input Tokens | Average Tokens / Run | Moulinette Token Limit Status | Pass Rate |"
     )
     lines.append("| :--- | :---: | :---: | :---: | :---: |")
-    lines.append("| **Baseline (No Truncation)** | 406,777 | ~380,000 | ❌ EXCEEDED (>300k Limit) | 46.7% |")
-    lines.append("| **Windowed (4k Char Truncation)** | 184,200 | ~140,000 | ✅ OK (Within Limits) | **92.5%** |")
+    lines.append(
+        "| **Baseline (No Truncation)** | 406,777 | ~380,000 | ❌ EXCEEDED (>300k Limit) | 46.7% |"
+    )
+    lines.append(
+        "| **Windowed (4k Char Truncation)** | 184,200 | ~140,000 | ✅ OK (Within Limits) | **92.5%** |"
+    )
     lines.append("")
 
-    lines.append("### Ablation 2: Two-Phase Submission Discipline vs One-Shot Submission")
+    lines.append(
+        "### Ablation 2: Two-Phase Submission Discipline vs One-Shot Submission"
+    )
     lines.append(
         "We compared permitting the agent to invoke `final_answer()` in the same iteration as editing/testing versus "
         "strict two-phase enforcement (Phase 1: run tests & stop; Phase 2: verify observation & submit final answer)."
@@ -505,10 +527,14 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     )
     lines.append("| :--- | :---: | :---: | :---: |")
     lines.append("| **One-Shot Execution** | 38.5% | 61.5% | 53.3% |")
-    lines.append("| **Two-Phase Discipline** | **0.0%** | **100.0%** | **92.5%** |")
+    lines.append(
+        "| **Two-Phase Discipline** | **0.0%** | **100.0%** | **92.5%** |"
+    )
     lines.append("")
 
-    lines.append("### Ablation 3: Dynamic MCP Tool Signature Generation vs Static Documentation")
+    lines.append(
+        "### Ablation 3: Dynamic MCP Tool Signature Generation vs Static Documentation"
+    )
     lines.append(
         "We evaluated static hardcoded prompt templates versus dynamic Python function signature generation parsed from MCP tool input schemas."
     )
@@ -518,7 +544,9 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     )
     lines.append("| :--- | :---: | :---: | :---: |")
     lines.append("| **Static Generic Prompt** | 27.5% | 18.0% | Step 3.2 |")
-    lines.append("| **Dynamic Schema Generation** | **0.0%** | **0.0%** | **Step 1.4** |")
+    lines.append(
+        "| **Dynamic Schema Generation** | **0.0%** | **0.0%** | **Step 1.4** |"
+    )
     lines.append("")
 
     # Section 6: Statistical Rigor & Analysis
@@ -572,11 +600,21 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
         "| Model Category | Evaluated Models | Sample Size | Observed Solve Rate | 95% Confidence Interval |"
     )
     lines.append("| :--- | :--- | :---: | :---: | :---: |")
-    lines.append("| **Frontier MoE** | `nvidia/nemotron-3-ultra-550b-a55b` | 5 runs | 100.0% (5/5) | [56.6% - 100.0%] |")
-    lines.append("| **Frontier Flagship** | `openai/gpt-4o` | 5 runs | 100.0% (5/5) | [56.6% - 100.0%] |")
-    lines.append("| **Lightweight Frontier** | `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `openai/gpt-4o-mini` | 15 runs | 100.0% (15/15) | [79.6% - 100.0%] |")
-    lines.append("| **Open-Weights Flagship & Code** | `meta-llama/llama-3.3-70b-instruct`, `qwen/qwen-2.5-coder-32b-instruct` | 10 runs | 100.0% (10/10) | [72.2% - 100.0%] |")
-    lines.append("| **European Compact Reasoning** | `mistralai/mistral-small-24b-instruct-2501` | 5 runs | 80.0% (4/5) | [37.6% - 96.4%] |")
+    lines.append(
+        "| **Frontier MoE** | `nvidia/nemotron-3-ultra-550b-a55b` | 5 runs | 100.0% (5/5) | [56.6% - 100.0%] |"
+    )
+    lines.append(
+        "| **Frontier Flagship** | `openai/gpt-4o` | 5 runs | 100.0% (5/5) | [56.6% - 100.0%] |"
+    )
+    lines.append(
+        "| **Lightweight Frontier** | `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `openai/gpt-4o-mini` | 15 runs | 100.0% (15/15) | [79.6% - 100.0%] |"
+    )
+    lines.append(
+        "| **Open-Weights Flagship & Code** | `meta-llama/llama-3.3-70b-instruct`, `qwen/qwen-2.5-coder-32b-instruct` | 10 runs | 100.0% (10/10) | [72.2% - 100.0%] |"
+    )
+    lines.append(
+        "| **European Compact Reasoning** | `mistralai/mistral-small-24b-instruct-2501` | 5 runs | 80.0% (4/5) | [37.6% - 96.4%] |"
+    )
     lines.append("")
 
     # Section 7: Cost Analysis
@@ -591,57 +629,107 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
         "| Model Identifier | Provider | Mean Cost / Solved Task | Accuracy-to-Cost Efficiency Rank |"
     )
     lines.append("| :--- | :--- | :---: | :---: |")
-    lines.append("| `nvidia/nemotron-3-ultra-550b-a55b` | NVIDIA NIM | **$0.0000** | 🥇 Rank 1 (Free Tier Frontier Leader) |")
-    lines.append("| `gemini-3.5-flash-lite` | Gemini | **$0.0021** | 🥈 Rank 2 (Fastest Flash-Lite Frontier) |")
-    lines.append("| `gemini-3.1-flash-lite` | Gemini | **$0.0022** | 🥉 Rank 3 (Ultra Low-Cost Reasoning) |")
-    lines.append("| `qwen/qwen-2.5-coder-32b-instruct` | OpenRouter | **$0.0028** | 🏅 Rank 4 (Highest Code Density) |")
-    lines.append("| `openai/gpt-4o-mini` | OpenRouter | **$0.0032** | 🏅 Rank 5 (Pareto Optimal Lightweight) |")
-    lines.append("| `mistralai/mistral-small-24b-instruct-2501` | OpenRouter | **$0.0041** | 🏅 Rank 6 (European Compact Efficiency) |")
-    lines.append("| `meta-llama/llama-3.3-70b-instruct` | OpenRouter | **$0.0051** | 🏅 Rank 7 (Strongest Open-Weights) |")
-    lines.append("| `openai/gpt-4o` | OpenRouter | **$0.0520** | 🏅 Rank 8 (High-Capability Frontier Baseline) |")
+    lines.append(
+        "| `nvidia/nemotron-3-ultra-550b-a55b` | NVIDIA NIM | **$0.0000** | 🥇 Rank 1 (Free Tier Frontier Leader) |"
+    )
+    lines.append(
+        "| `gemini-3.5-flash-lite` | Gemini | **$0.0021** | 🥈 Rank 2 (Fastest Flash-Lite Frontier) |"
+    )
+    lines.append(
+        "| `gemini-3.1-flash-lite` | Gemini | **$0.0022** | 🥉 Rank 3 (Ultra Low-Cost Reasoning) |"
+    )
+    lines.append(
+        "| `qwen/qwen-2.5-coder-32b-instruct` | OpenRouter | **$0.0028** | 🏅 Rank 4 (Highest Code Density) |"
+    )
+    lines.append(
+        "| `openai/gpt-4o-mini` | OpenRouter | **$0.0032** | 🏅 Rank 5 (Pareto Optimal Lightweight) |"
+    )
+    lines.append(
+        "| `mistralai/mistral-small-24b-instruct-2501` | OpenRouter | **$0.0041** | 🏅 Rank 6 (European Compact Efficiency) |"
+    )
+    lines.append(
+        "| `meta-llama/llama-3.3-70b-instruct` | OpenRouter | **$0.0051** | 🏅 Rank 7 (Strongest Open-Weights) |"
+    )
+    lines.append(
+        "| `openai/gpt-4o` | OpenRouter | **$0.0520** | 🏅 Rank 8 (High-Capability Frontier Baseline) |"
+    )
     lines.append("")
 
     # Section 8: Visualizations
     lines.append("## 8. Empirical Visualizations")
     lines.append("")
-    lines.append("### 8.1. Pareto Frontier: Per-Request Latency vs Task Solve Rate")
+    lines.append(
+        "### 8.1. Pareto Frontier: Per-Request Latency vs Task Solve Rate"
+    )
     lines.append("")
     lines.append("![Pareto Frontier](benchmarks/assets/pareto_frontier.svg)")
     lines.append("")
     lines.append("<details>")
-    lines.append("<summary>📊 Click to expand Mermaid Pareto Flowchart</summary>")
+    lines.append(
+        "<summary>📊 Click to expand Mermaid Pareto Flowchart</summary>"
+    )
     lines.append("")
     lines.append("```mermaid")
     lines.append("flowchart TD")
-    lines.append('    subgraph Optimal ["🟢 Pareto Optimal Frontier (High Accuracy &amp; Sub-Second Latency)"]')
-    lines.append('        A["gemini-3.1-flash-lite<br/>0.88s | 100% | $0.0022"]:::optimal')
-    lines.append('        B["gemini-3.5-flash-lite<br/>0.95s | 100% | $0.0021"]:::optimal')
-    lines.append('        C["openai/gpt-4o-mini<br/>1.01s | 100% | $0.0032"]:::optimal')
+    lines.append(
+        '    subgraph Optimal ["🟢 Pareto Optimal Frontier (High Accuracy &amp; Sub-Second Latency)"]'
+    )
+    lines.append(
+        '        A["gemini-3.1-flash-lite<br/>0.88s | 100% | $0.0022"]:::optimal'
+    )
+    lines.append(
+        '        B["gemini-3.5-flash-lite<br/>0.95s | 100% | $0.0021"]:::optimal'
+    )
+    lines.append(
+        '        C["openai/gpt-4o-mini<br/>1.01s | 100% | $0.0032"]:::optimal'
+    )
     lines.append("    end")
-    lines.append('    subgraph Specialists ["🔵 High-Capacity &amp; AST Specialists"]')
-    lines.append('        D["openai/gpt-4o<br/>2.41s | 100% | $0.0520"]:::balanced')
-    lines.append('        E["meta-llama/llama-3.3-70b<br/>4.38s | 100% | $0.0051"]:::balanced')
-    lines.append('        F["nvidia/nemotron-3-ultra<br/>4.89s | 100% | FREE Tier"]:::balanced')
-    lines.append('        G["qwen/qwen-2.5-coder-32b<br/>6.09s | 100% | $0.0028"]:::balanced')
+    lines.append(
+        '    subgraph Specialists ["🔵 High-Capacity &amp; AST Specialists"]'
+    )
+    lines.append(
+        '        D["openai/gpt-4o<br/>2.41s | 100% | $0.0520"]:::balanced'
+    )
+    lines.append(
+        '        E["meta-llama/llama-3.3-70b<br/>4.38s | 100% | $0.0051"]:::balanced'
+    )
+    lines.append(
+        '        F["nvidia/nemotron-3-ultra<br/>4.89s | 100% | FREE Tier"]:::balanced'
+    )
+    lines.append(
+        '        G["qwen/qwen-2.5-coder-32b<br/>6.09s | 100% | $0.0028"]:::balanced'
+    )
     lines.append("    end")
     lines.append('    subgraph Compact ["🟡 European Compact Architecture"]')
-    lines.append('        H["mistralai/mistral-small-24b<br/>1.16s | 80% | $0.0041"]:::suboptimal')
+    lines.append(
+        '        H["mistralai/mistral-small-24b<br/>1.16s | 80% | $0.0041"]:::suboptimal'
+    )
     lines.append("    end")
     lines.append("    A --- B --- C")
     lines.append("    D --- E --- F --- G")
     lines.append("")
-    lines.append("    classDef optimal fill:#d4edda,stroke:#28a745,stroke-width:2px;")
-    lines.append("    classDef balanced fill:#d1ecf1,stroke:#17a2b8,stroke-width:2px;")
-    lines.append("    classDef suboptimal fill:#fff3cd,stroke:#ffc107,stroke-width:2px;")
+    lines.append(
+        "    classDef optimal fill:#d4edda,stroke:#28a745,stroke-width:2px;"
+    )
+    lines.append(
+        "    classDef balanced fill:#d1ecf1,stroke:#17a2b8,stroke-width:2px;"
+    )
+    lines.append(
+        "    classDef suboptimal fill:#fff3cd,stroke:#ffc107,stroke-width:2px;"
+    )
     lines.append("```")
     lines.append("</details>")
     lines.append("")
-    lines.append("### 8.2. Intermediary Metrics Lifecycle & Agent Control Flow")
+    lines.append(
+        "### 8.2. Intermediary Metrics Lifecycle & Agent Control Flow"
+    )
     lines.append(
         "This architectural diagram maps where each intermediary metric is measured during task execution:"
     )
     lines.append("")
-    lines.append("![Intermediary Metrics Architecture](benchmarks/assets/intermediary_metrics.svg)")
+    lines.append(
+        "![Intermediary Metrics Architecture](benchmarks/assets/intermediary_metrics.svg)"
+    )
     lines.append("")
     lines.append("<details>")
     lines.append("<summary>🔄 Click to expand Mermaid Sequence Flow</summary>")
@@ -658,7 +746,9 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     lines.append("    L->>B: execute_command (find / grep)")
     lines.append("    B-->>L: File paths")
     lines.append("    L->>B: read_file (target file in repo)")
-    lines.append("    Note over L: 🎯 Metric 1: First Target Touch (Exploration Efficiency)")
+    lines.append(
+        "    Note over L: 🎯 Metric 1: First Target Touch (Exploration Efficiency)"
+    )
     lines.append("")
     lines.append("    Note over L,B: Phase 2: Patching & Test Verification")
     lines.append("    L->>B: edit_file (apply fix)")
@@ -669,15 +759,21 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     lines.append("    Note over L,B: Phase 3: Discipline & Submission")
     lines.append("    L->>B: execute_command (git diff)")
     lines.append("    L->>H: final_answer(diff_patch)")
-    lines.append("    Note over L: 🎯 Metric 3: Submission Discipline (0-1 step lag)")
+    lines.append(
+        "    Note over L: 🎯 Metric 3: Submission Discipline (0-1 step lag)"
+    )
     lines.append("```")
     lines.append("</details>")
     lines.append("")
     lines.append("### 8.3. Visual Performance & Latency Spectrum")
     lines.append("")
-    lines.append("![Model Performance Spectrum](benchmarks/assets/model_performance.svg)")
+    lines.append(
+        "![Model Performance Spectrum](benchmarks/assets/model_performance.svg)"
+    )
     lines.append("")
-    lines.append("| Model Identifier | Solve Rate | Visual Accuracy | Avg Latency | Latency Distribution Bar |")
+    lines.append(
+        "| Model Identifier | Solve Rate | Visual Accuracy | Avg Latency | Latency Distribution Bar |"
+    )
     lines.append("| :--- | :---: | :--- | :---: | :--- |")
     for m_name, runs in models_seen.items():
         pass_count = sum(1 for run in runs if run["passed"])
@@ -686,7 +782,9 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
         # Unicode bar: 10 chars
         filled = int(round(rate / 10.0))
         bar = "█" * filled + "░" * (10 - filled)
-        avg_lat = round(sum(run["avg_latency_s"] for run in runs) / tot_count, 2)
+        avg_lat = round(
+            sum(run["avg_latency_s"] for run in runs) / tot_count, 2
+        )
         # Latency bar: scale up to 10s
         lat_fill = min(10, max(1, int(round(avg_lat))))
         lat_bar = "▰" * lat_fill + "▱" * (10 - lat_fill)
@@ -718,7 +816,9 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     lines.append(
         "- **Harness Environment**: Linux x86_64, Python 3.10 / uv, Docker 24+ containerized sandbox."
     )
-    lines.append("- **Hyperparameters**: `temperature = 0.0`, `max_tokens = 4096`, `top_p = 1.0`.")
+    lines.append(
+        "- **Hyperparameters**: `temperature = 0.0`, `max_tokens = 4096`, `top_p = 1.0`."
+    )
     lines.append(
         "- **Automated Verification Command**: `make benchmark-report` (or `python3 benchmarks/run_benchmark.py --report-only`)."
     )
@@ -735,6 +835,7 @@ def generate_benchmark_report(results: list[dict[str, Any]]) -> None:
     # Generate companion visual SVG diagrams
     try:
         from benchmarks.generate_charts import main as generate_all_charts
+
         generate_all_charts()
     except Exception as exc:
         print(f"⚠️ Could not generate SVG charts: {exc}")
@@ -769,7 +870,9 @@ def main() -> None:
             model_verified: bool | None = None
             for t in selected_tasks:
                 current_run += 1
-                output_file = RUNS_DIR / f"solution_{m['slug']}_{t['slug']}.json"
+                output_file = (
+                    RUNS_DIR / f"solution_{m['slug']}_{t['slug']}.json"
+                )
 
                 if output_file.exists() and not args.force:
                     print(
@@ -778,7 +881,9 @@ def main() -> None:
                     continue
 
                 if model_verified is None:
-                    print(f"🔍 Pre-flight checking availability for {m['name']}...")
+                    print(
+                        f"🔍 Pre-flight checking availability for {m['name']}..."
+                    )
                     model_verified = check_model_availability(m)
                     if not model_verified:
                         print(
