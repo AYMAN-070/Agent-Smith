@@ -20,7 +20,7 @@ except Exception as err:
     sys.exit(1)
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments(args: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for the SWE-bench agent."""
     parser = argparse.ArgumentParser(description="Agent Smith SWE-bench CLI")
     parser.add_argument(
@@ -66,7 +66,19 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Optional maximum loop iterations override",
     )
-    return parser.parse_args()
+    raw_args = list(sys.argv[1:] if args is None else args)
+    fixed_args: list[str] = []
+    for token in raw_args:
+        if token.startswith("-"):
+            fixed_args.append(token)
+        else:
+            if fixed_args and (
+                not fixed_args[-1].startswith("-") or "=" in fixed_args[-1]
+            ):
+                fixed_args[-1] = f"{fixed_args[-1]} {token}"
+            else:
+                fixed_args.append(token)
+    return parser.parse_args(fixed_args)
 
 
 def main() -> None:
