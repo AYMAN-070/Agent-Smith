@@ -327,8 +327,6 @@ def isolated_worker(
             "code": error.code,
             "output": get_captured_output(),
         }
-            "output": get_captured_output(),
-        }
     except Exception as error:
         result = {
             "status": "error",
