@@ -98,7 +98,7 @@ def run_interactive_repl(executor: SandboxExecutor) -> None:
                 if stripped.startswith(("def ", "class ")):
                     code_preamble.append(user_code)
 
-        except EOFError:
+        except (EOFError, SystemExit):
             print("\nExiting sandbox.")
             break
         except KeyboardInterrupt:
