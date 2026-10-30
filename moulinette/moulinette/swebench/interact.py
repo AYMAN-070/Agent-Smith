@@ -47,37 +47,7 @@ EXAM_POOL = SEED_POOL + [
 ]
 
 from swebench.harness.test_spec.test_spec import make_test_spec
-from swebench.harness.docker_utils import exec_run_with_timeout
-import io
-import os
-import tarfile
-import swebench.harness.docker_utils as _sdu
-
-
-def _safe_copy_to_container(container, src: Path, dst: Path):
-    """Copy a file to a container with uid=0, gid=0 to support rootless Docker."""
-    if os.path.dirname(dst) == "":
-        raise ValueError(f"Destination path parent directory cannot be empty!, dst: {dst}")
-
-    tar_stream = io.BytesIO()
-    with tarfile.open(fileobj=tar_stream, mode="w") as tar:
-        ti = tar.gettarinfo(str(src), arcname=dst.name)
-        ti.uid = 0
-        ti.gid = 0
-        ti.uname = "root"
-        ti.gname = "root"
-        if ti.isreg():
-            with open(src, "rb") as f:
-                tar.addfile(ti, f)
-        else:
-            tar.addfile(ti)
-
-    container.exec_run(f"mkdir -p {dst.parent}")
-    container.put_archive(os.path.dirname(dst), tar_stream.getvalue())
-
-
-copy_to_container = _safe_copy_to_container
-_sdu.copy_to_container = _safe_copy_to_container
+from swebench.harness.docker_utils import copy_to_container, exec_run_with_timeout
 from swebench.harness.constants import (
     DOCKER_PATCH,
     DOCKER_WORKDIR,

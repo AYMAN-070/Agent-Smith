@@ -631,7 +631,7 @@ def generate_token_curve_svg(output_path: Path) -> None:
     )
     svg.append('    <circle cx="12.5" cy="5" r="4" fill="#ef4444"/>')
     svg.append(
-        '    <text x="35" y="9" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">Sans Fenêtrage (Sortie brute pytest -&gt; Dépassement 300k)</text>'
+        '    <text x="35" y="9" font-family="sans-serif" font-size="11" font-weight="600" fill="#334155">Unbounded Output (Raw pytest output -&gt; Exceeds 300k limit)</text>'
     )
 
     # Green legend item
@@ -640,7 +640,7 @@ def generate_token_curve_svg(output_path: Path) -> None:
     )
     svg.append('    <circle cx="372.5" cy="5" r="4" fill="#10b981"/>')
     svg.append(
-        '    <text x="395" y="9" font-family="sans-serif" font-size="11" font-weight="700" fill="#047857">Avec Fenêtrage Agent Smith (40 tête / 60 fin -&gt; 92.5% succès)</text>'
+        '    <text x="395" y="9" font-family="sans-serif" font-size="11" font-weight="700" fill="#047857">Windowed Observation (40 head / 60 tail -&gt; 92.5% solve rate)</text>'
     )
     svg.append("  </g>")
 
