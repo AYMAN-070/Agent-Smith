@@ -1,3 +1,5 @@
+"""LLM request handling and response parsing for Agent Smith."""
+
 import time
 from typing import Any
 
@@ -18,18 +20,22 @@ class LlmResponse:
         self.model_name: str = data.get("model", "")
         self.retries = retries
 
-        self.llm_output: str = data["choices"][0]["message"]["content"]
+        choices = data.get("choices") or [{}]
+        message = choices[0].get("message", {}) if choices else {}
+        raw_content = message.get("content")
+        self.llm_output: str = str(raw_content) if raw_content is not None else ""
         parser = ResponseParser(self.llm_output)
         self.code: str = parser.code
         self.is_malformed: bool = parser.is_malformed
         self.malformed_reason: str = parser.malformed_reason
-        self.url = data["url"]
+        self.url: str = data.get("url", "")
 
         usage = data.get("usage", {})
         self.input_tokens: int = usage.get("prompt_tokens", 0)
         self.output_tokens: int = usage.get("completion_tokens", 0)
 
     def parse(self, llm_text: str) -> str:
+        """Parse raw LLM output and extract executable Python code."""
         return ResponseParser.parse(llm_text)
 
 

@@ -9,14 +9,18 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from src.agent.loop import SWEAgentLoop
-from src.docker_handler import DockerContainer
-from src.models import SWEBenchTaskInput
-from src.sandbox.executor import SandboxExecutor
-from src.rules import RulesSwe
+try:
+    from src.agent.loop import SWEAgentLoop
+    from src.docker_handler import DockerContainer
+    from src.models import SWEBenchTaskInput
+    from src.rules import RulesSwe
+    from src.sandbox.executor import SandboxExecutor
+except Exception as err:
+    print(f"Error importing modules: {err}", file=sys.stderr)
+    sys.exit(1)
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments(args: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for the SWE-bench agent."""
     parser = argparse.ArgumentParser(description="Agent Smith SWE-bench CLI")
     parser.add_argument(
@@ -55,32 +59,58 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Optional provider API URL",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--max_iterations",
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="Optional maximum loop iterations override",
+    )
+    raw_args = list(sys.argv[1:] if args is None else args)
+    fixed_args: list[str] = []
+    for token in raw_args:
+        if token.startswith("-"):
+            fixed_args.append(token)
+        else:
+            if fixed_args and (
+                not fixed_args[-1].startswith("-") or "=" in fixed_args[-1]
+            ):
+                fixed_args[-1] = f"{fixed_args[-1]} {token}"
+            else:
+                fixed_args.append(token)
+    return parser.parse_args(fixed_args)
 
 
 def main() -> None:
     """Run the SWE-bench agent workflow."""
     args = parse_arguments()
-    task_content = Path(args.task_file).read_text(encoding="utf-8")
-    task = SWEBenchTaskInput.model_validate_json(task_content)
-    docker_container = DockerContainer(task.docker_image)
-    sandbox = SandboxExecutor()
-    rules = RulesSwe()
-    atexit.register(docker_container.stop_and_remove)
-
-    def clean_exit(signum: int, frame: Any) -> None:
-        """Handle termination signals and cleanup container and sandbox."""
-        print("\nKill signal received, cleaning in progress...")
-        docker_container.stop_and_remove()
-        sandbox.close()
-        sys.exit(143)
-
-    signal.signal(signal.SIGTERM, clean_exit)
-    signal.signal(signal.SIGINT, clean_exit)
-    if hasattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, clean_exit)
+    docker_container: DockerContainer | None = None
+    sandbox: SandboxExecutor | None = None
 
     try:
+        task_content = Path(args.task_file).read_text(encoding="utf-8")
+        task = SWEBenchTaskInput.model_validate_json(task_content)
+        docker_container = DockerContainer(task.docker_image)
+        sandbox = SandboxExecutor()
+        rules = RulesSwe(args.max_iterations)
+        atexit.register(docker_container.stop_and_remove)
+
+        def clean_exit(signum: int, frame: Any) -> None:
+            """Handle termination signals and cleanup container and sandbox."""
+            if signum == signal.SIGINT:
+                raise KeyboardInterrupt()
+            print("\nKill signal received, cleaning in progress...")
+            if docker_container:
+                docker_container.stop_and_remove()
+            if sandbox:
+                sandbox.close()
+            sys.exit(143)
+
+        signal.signal(signal.SIGTERM, clean_exit)
+        signal.signal(signal.SIGINT, clean_exit)
+        if hasattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, clean_exit)
+
         container_id = docker_container.start()
         docker_container.setup_eval_script(task.eval_script)
         os.environ["SWE_CONTAINER_ID"] = container_id
@@ -102,14 +132,22 @@ def main() -> None:
             model_name=args.model_name,
             provider_url=args.provider_url,
             rules=rules,
+            docker_container=docker_container,
         )
         agent.run()
+    except KeyboardInterrupt:
+        print("\nAgent process interrupted by user (Ctrl+C).", file=sys.stderr)
+        sys.exit(130)
+    except SystemExit as err:
+        sys.exit(err.code if err.code is not None else 0)
     except Exception as err:
         print(f"\n{err}", file=sys.stderr)
         sys.exit(1)
     finally:
-        sandbox.close()
-        docker_container.stop_and_remove()
+        if sandbox:
+            sandbox.close()
+        if docker_container:
+            docker_container.stop_and_remove()
 
 
 if __name__ == "__main__":

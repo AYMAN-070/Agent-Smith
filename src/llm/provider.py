@@ -16,11 +16,14 @@ except ImportError:
 
 def _get_api_keys(*patterns: str) -> list[str]:
     """Extract valid non-empty API keys from environment matching given patterns."""
-    return [
-        val.strip()
-        for key, val in os.environ.items()
-        if val.strip() and any(pat.upper() in key.upper() for pat in patterns)
-    ]
+    keys: list[str] = []
+    for key, val in os.environ.items():
+        if val.strip() and any(pat.upper() in key.upper() for pat in patterns):
+            for part in val.split(","):
+                clean = part.strip().replace("Bearer ", "")
+                if clean and clean not in keys:
+                    keys.append(clean)
+    return keys
 
 
 class Provider:
@@ -89,22 +92,22 @@ class Provider:
         else:
             self.provider = [
                 {
-                    "name": "NVIDIA",
-                    "base_url": "https://integrate.api.nvidia.com/v1",
-                    "api_keys": nvidia_keys,
-                    "models": [
-                        "nvidia/nemotron-3-ultra-550b-a55b",
-                    ],
-                },
-                {
                     "name": "Gemini",
                     "base_url": (
                         "https://generativelanguage.googleapis.com/v1beta/openai"
                     ),
                     "api_keys": gemini_keys,
                     "models": [
-                        "gemini-3.5-flash-lite",
                         "gemini-3.1-flash-lite",
+                        "gemini-3.5-flash-lite",
+                    ],
+                },
+                {
+                    "name": "NVIDIA",
+                    "base_url": "https://integrate.api.nvidia.com/v1",
+                    "api_keys": nvidia_keys,
+                    "models": [
+                        "nvidia/nemotron-3-ultra-550b-a55b",
                     ],
                 },
                 {

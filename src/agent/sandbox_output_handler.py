@@ -47,11 +47,17 @@ class SandboxOutputHandler:
         no_failure = (
             "failed" not in output_lower
             and "failures" not in output_lower
-            and "error" not in output_lower
+            and "error:" not in output_lower
+            and "traceback" not in output_lower
         )
-        has_passed = "passed" in output_lower or "pass" in output_lower
+        has_passed = (
+            "passed" in output_lower
+            or "\nok" in output_lower
+            or "ok (" in output_lower
+            or " 0 failures" in output_lower
+        )
 
-        return exit_zero and (has_passed or no_failure)
+        return exit_zero and no_failure and has_passed
 
     @staticmethod
     def clean_and_truncate(
@@ -177,6 +183,12 @@ class SandboxOutputHandler:
             sand_answer.get("error") or "Execution failed without details."
         )
         error_trace = cls.clean_and_truncate(code, raw_error)
+        partial_output = sand_answer.get("output", "").strip()
+        if partial_output:
+            cleaned_partial = cls.clean_and_truncate(code, partial_output)
+            error_trace += (
+                f"\n\n[PARTIAL OUTPUT BEFORE INTERRUPTION]:\n{cleaned_partial}"
+            )
         print("\n" + "!" * 50)
         print("❌ FAILED: Error detected in sandbox:")
         print("-" * 50)
@@ -233,6 +245,12 @@ class SandboxOutputHandler:
 
         raw_error = sand_answer.get("error") or "Unknown execution error."
         error_trace = cls.clean_and_truncate(code, raw_error)
+        partial_output = sand_answer.get("output", "").strip()
+        if partial_output:
+            cleaned_partial = cls.clean_and_truncate(code, partial_output)
+            error_trace += (
+                f"\n\n[PARTIAL OUTPUT BEFORE INTERRUPTION]:\n{cleaned_partial}"
+            )
         print("\n" + "!" * 50)
         print("❌ FAILED: Error detected in sandbox:")
         print(f"{error_trace}")

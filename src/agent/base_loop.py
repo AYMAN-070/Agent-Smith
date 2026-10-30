@@ -12,7 +12,7 @@ from src.models import (
     StepMetrics,
     SWEBenchTaskInput,
 )
-from src.rules import RulesMpbb, RulesSwe
+from src.rules import RulesMbpp, RulesSwe
 from src.sandbox.executor import SandboxExecutor
 
 
@@ -22,17 +22,17 @@ class BaseAgentLoop:
     benchmark: str = ""
     failure_return_value: str = "didnt succeed"
     failure_solution_value: str = ""
-    timeout_margin: float = 10.0
 
     def __init__(
         self,
         task: MBPPTaskInput | SWEBenchTaskInput,
         sandbox: SandboxExecutor,
-        rules: RulesMpbb | RulesSwe,
+        rules: RulesMbpp | RulesSwe,
         output_path: str = "solution.json",
         model_name: str | None = None,
         provider_url: str | None = None,
     ) -> None:
+        """Initialize the base agent loop with task data, sandbox, rules, and LLM."""
         self.task = task
         self.sandbox = sandbox
         self.rules = rules
@@ -50,7 +50,11 @@ class BaseAgentLoop:
         return ""
 
     def record_step(
-        self, llm: LlmResponse, sandbox: dict[str, Any], step: int
+        self,
+        llm: LlmResponse,
+        sandbox: dict[str, Any],
+        step: int,
+        executed_code: str | None = None,
     ) -> StepMetrics:
         """Record metrics and execution output for an iteration step."""
         raw_output = (
@@ -58,6 +62,7 @@ class BaseAgentLoop:
             or sandbox.get("error")
             or sandbox.get("status", "")
         )
+        code_input = executed_code if executed_code is not None else llm.code
         step_metric = StepMetrics(
             step=step,
             input_tokens=llm.input_tokens,
@@ -66,15 +71,13 @@ class BaseAgentLoop:
             api_url=llm.url,
             model_name=llm.model_name,
             llm_output=llm.llm_output,
-            sandbox_input=llm.code,
+            sandbox_input=code_input,
             sandbox_output=str(raw_output),
             retries=llm.retries,
         )
         return step_metric
 
-    def record_no_code_step(
-        self, llm: LlmResponse, step: int
-    ) -> StepMetrics:
+    def record_no_code_step(self, llm: LlmResponse, step: int) -> StepMetrics:
         """Record step metrics for an iteration where no code was generated."""
         sand_answer = {
             "status": "error",
@@ -119,10 +122,7 @@ class BaseAgentLoop:
 
         if start_time is not None:
             elapsed_time = time.time() - start_time
-            effective_timeout = max(
-                0.0, self.rules.timeout - self.timeout_margin
-            )
-            if elapsed_time > effective_timeout:
+            if elapsed_time > self.rules.timeout:
                 msg = f"Timeout exceeded: {elapsed_time:.2f}s > {self.rules.timeout}s"
                 print(f"⚠️ {msg}")
                 return msg
@@ -187,10 +187,26 @@ class BaseAgentLoop:
             total_time_seconds=total_time_seconds,
             error=error,
         )
-        Path(self.output_path).write_text(
+        out_path = Path(self.output_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(
             solution_output.model_dump_json(indent=2), encoding="utf-8"
         )
         return solution_output
+
+    def _save_checkpoint(
+        self,
+        steps: list[StepMetrics],
+        start_time: float,
+    ) -> None:
+        """Save intermediate progress to solution.json after each iteration."""
+        self._save_solution(
+            status=False,
+            solution=self.failure_solution_value,
+            steps=steps,
+            total_time_seconds=time.time() - start_time,
+            error="Process interrupted or timed out before completion.",
+        )
 
     def _save_failure(
         self,
@@ -207,3 +223,22 @@ class BaseAgentLoop:
             error=error,
         )
         return self.failure_return_value
+
+    def handle_shutdown(
+        self,
+        exc: BaseException,
+        steps_metric: list[StepMetrics],
+        start_time: float,
+    ) -> None:
+        """Perform proper shutdown when program flow exceptions occur."""
+        exc_name = type(exc).__name__
+        print(
+            f"\n🛑 Execution interrupted by {exc_name}. "
+            "Performing proper agent loop shutdown..."
+        )
+        self._save_failure(
+            steps_metric,
+            start_time,
+            error=f"Execution interrupted by {exc_name}",
+        )
+        self.sandbox.close()

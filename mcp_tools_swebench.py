@@ -3,11 +3,20 @@
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
-from fastmcp import FastMCP
+try:
+    from fastmcp import FastMCP
+except Exception as err:
+    print(f"Error importing FastMCP: {err}", file=sys.stderr)
+    sys.exit(1)
 
-mcp = FastMCP("SWE MCP Server")
+try:
+    mcp = FastMCP("SWE MCP Server")
+except Exception as err:
+    print(f"Error initializing FastMCP: {err}", file=sys.stderr)
+    sys.exit(1)
 
 # Docker container ID for SWE-bench (if running against a container)
 CONTAINER_ID = os.environ.get("SWE_CONTAINER_ID") or os.environ.get(
@@ -147,12 +156,22 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
             if old_str not in data:
                 return f"Error: old_str not found in {filepath}."
             data = data.replace(old_str, new_str)
+            syntax_notice = ""
+            if filepath.endswith(".py"):
+                try:
+                    import ast
+                    ast.parse(data)
+                except SyntaxError as e:
+                    syntax_notice = (
+                        f" (Warning: edit introduced a SyntaxError on "
+                        f"line {e.lineno}: {e.msg})"
+                    )
             write_res = _docker_exec(
                 ["tee", str(target_path)], input_text=data
             )
             if write_res.returncode != 0:
                 return f"Error writing file '{filepath}': {write_res.stderr}"
-            return "FILE EDITED"
+            return f"FILE EDITED{syntax_notice}"
         except subprocess.TimeoutExpired:
             return f"Error: Editing file '{filepath}' timed out."
         except Exception as e:
@@ -174,10 +193,20 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
         return f"Error: old_str not found in {filepath}."
 
     data = data.replace(old_str, new_str)
+    syntax_notice = ""
+    if filepath.endswith(".py"):
+        try:
+            import ast
+            ast.parse(data)
+        except SyntaxError as e:
+            syntax_notice = (
+                f" (Warning: edit introduced a SyntaxError on "
+                f"line {e.lineno}: {e.msg})"
+            )
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.write(data)
-        return "FILE EDITED"
+        return f"FILE EDITED{syntax_notice}"
     except Exception as e:
         return f"Error writing file '{filepath}': {e}"
 
@@ -227,25 +256,28 @@ else:
         except Exception as e:
             return f"Error listing files: {e}"
 
-    path = Path(directory)
-    if not path.is_absolute():
-        path = Path(TESTBED_PATH) / path
-    if not path.exists() or not path.is_dir():
-        return f"Error: '{directory}' does not exist or is not a directory."
+    try:
+        path = Path(directory)
+        if not path.is_absolute():
+            path = Path(TESTBED_PATH) / path
+        if not path.exists() or not path.is_dir():
+            return f"Error: '{directory}' does not exist or is not a directory."
 
-    matched_files = []
-    testbed_base = Path(TESTBED_PATH).resolve()
-    for p in path.rglob(pattern):
-        if not p.is_file() or ".git" in p.parts:
-            continue
-        try:
-            matched_files.append(str(p.resolve().relative_to(testbed_base)))
-        except ValueError:
-            matched_files.append(str(p.resolve()))
+        matched_files = []
+        testbed_base = Path(TESTBED_PATH).resolve()
+        for p in path.rglob(pattern):
+            if not p.is_file() or ".git" in p.parts:
+                continue
+            try:
+                matched_files.append(str(p.resolve().relative_to(testbed_base)))
+            except ValueError:
+                matched_files.append(str(p.resolve()))
 
-    if not matched_files:
-        return f"No files matching pattern '{pattern}' found in '{directory}'."
-    return "\n".join(sorted(matched_files))
+        if not matched_files:
+            return f"No files matching pattern '{pattern}' found in '{directory}'."
+        return "\n".join(sorted(matched_files))
+    except Exception as e:
+        return f"Error listing files: {e}"
 
 
 # Code Search Tools
@@ -398,54 +430,57 @@ else:
         except Exception as e:
             return f"Error finding references: {e}"
 
-    root_path = Path(TESTBED_PATH).resolve()
-    if not root_path.exists():
-        return f"Error: Root directory '{root_path}' does not exist."
-
     try:
-        compiled_pattern = re.compile(pattern)
-    except re.error as e:
-        return f"Error: Invalid pattern for name '{name}': {e}"
+        root_path = Path(TESTBED_PATH).resolve()
+        if not root_path.exists():
+            return f"Error: Root directory '{root_path}' does not exist."
 
-    def_path = None
-    try:
-        p = Path(filepath)
-        def_path = (p if p.is_absolute() else (root_path / p)).resolve()
-    except Exception:
-        pass
-
-    try:
-        target_line = int(line)
-    except (ValueError, TypeError):
-        target_line = -1
-
-    results = []
-    for file_path in root_path.rglob("*.py"):
-        if not file_path.is_file() or ".git" in file_path.parts:
-            continue
-
-        resolved_file = file_path.resolve()
         try:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                for line_nb, line_content in enumerate(f, start=1):
-                    if (
-                        def_path
-                        and resolved_file == def_path
-                        and line_nb == target_line
-                    ):
-                        continue
-                    if compiled_pattern.search(line_content):
-                        results.append(
-                            f"{resolved_file}:{line_nb} "
-                            f"{line_content.rstrip()}"
-                        )
-        except (PermissionError, OSError):
-            continue
+            compiled_pattern = re.compile(pattern)
+        except re.error as e:
+            return f"Error: Invalid pattern for name '{name}': {e}"
 
-    if not results:
-        return "No matches found."
+        def_path = None
+        try:
+            p = Path(filepath)
+            def_path = (p if p.is_absolute() else (root_path / p)).resolve()
+        except Exception:
+            pass
 
-    return "\n".join(results)
+        try:
+            target_line = int(line)
+        except (ValueError, TypeError):
+            target_line = -1
+
+        results = []
+        for file_path in root_path.rglob("*.py"):
+            if not file_path.is_file() or ".git" in file_path.parts:
+                continue
+
+            resolved_file = file_path.resolve()
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line_nb, line_content in enumerate(f, start=1):
+                        if (
+                            def_path
+                            and resolved_file == def_path
+                            and line_nb == target_line
+                        ):
+                            continue
+                        if compiled_pattern.search(line_content):
+                            results.append(
+                                f"{resolved_file}:{line_nb} "
+                                f"{line_content.rstrip()}"
+                            )
+            except (PermissionError, OSError):
+                continue
+
+        if not results:
+            return "No matches found."
+
+        return "\n".join(results)
+    except Exception as e:
+        return f"Error finding references: {e}"
 
 
 # Execution Tools
@@ -622,30 +657,34 @@ def run_command(command: str, workdir: str = "") -> str:
 
 
 if __name__ == "__main__":
-    import argparse
+    try:
+        import argparse
 
-    parser = argparse.ArgumentParser(description="SWE-bench MCP Server")
-    parser.add_argument(
-        "--container-id",
-        type=str,
-        default="",
-        help="Docker container ID (overrides SWE_CONTAINER_ID)",
-    )
-    parser.add_argument(
-        "--transport",
-        default="stdio",
-        choices=["stdio", "sse", "streamable-http"],
-        help="MCP transport protocol",
-    )
-    parser.add_argument(
-        "--port", type=int, default=8000, help="Port for HTTP/SSE transport"
-    )
-    args, _ = parser.parse_known_args()
+        parser = argparse.ArgumentParser(description="SWE-bench MCP Server")
+        parser.add_argument(
+            "--container-id",
+            type=str,
+            default="",
+            help="Docker container ID (overrides SWE_CONTAINER_ID)",
+        )
+        parser.add_argument(
+            "--transport",
+            default="stdio",
+            choices=["stdio", "sse", "streamable-http"],
+            help="MCP transport protocol",
+        )
+        parser.add_argument(
+            "--port", type=int, default=8000, help="Port for HTTP/SSE transport"
+        )
+        args, _ = parser.parse_known_args()
 
-    if args.container_id:
-        CONTAINER_ID = args.container_id
+        if args.container_id:
+            CONTAINER_ID = args.container_id
 
-    if args.transport in ("sse", "streamable-http"):
-        mcp.run(transport=args.transport, port=args.port)
-    else:
-        mcp.run(transport="stdio")
+        if args.transport in ("sse", "streamable-http"):
+            mcp.run(transport=args.transport, port=args.port)
+        else:
+            mcp.run(transport="stdio")
+    except Exception as err:
+        print(f"SWE MCP server error: {err}", file=sys.stderr)
+        sys.exit(1)

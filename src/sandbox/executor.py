@@ -51,7 +51,16 @@ SAFE_BUILTINS: dict[str, Any] = {
     "type": type,
     "callable": callable,
     "hash": hash,
+    "BaseException": BaseException,
     "Exception": Exception,
+    "SystemExit": SystemExit,
+    "KeyboardInterrupt": KeyboardInterrupt,
+    "RuntimeError": RuntimeError,
+    "ImportError": ImportError,
+    "PermissionError": PermissionError,
+    "FileNotFoundError": FileNotFoundError,
+    "exit": sys.exit,
+    "quit": sys.exit,
     "ValueError": ValueError,
     "TypeError": TypeError,
     "KeyError": KeyError,
@@ -228,10 +237,22 @@ def transform_to_interactive_code(code: str) -> Any:
     Any
         Compiled code object ready for exec, or original code if parsing fails.
     """
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return code
+    tree = ast.parse(code)
+    forbidden_dunders = {
+        "__globals__", "__class__", "__subclasses__",
+        "__builtins__", "__code__", "__closure__",
+        "__dict__", "__bases__", "__mro__"
+    }
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in forbidden_dunders:
+            raise PermissionError(
+                f"Sandbox security: access to '{node.attr}' is forbidden."
+            )
+        elif isinstance(node, ast.Name) and node.id in forbidden_dunders:
+            raise PermissionError(
+                f"Sandbox security: access to '{node.id}' is forbidden."
+            )
 
     for node in tree.body:
         # Wrap standalone top-level function/tool calls
@@ -251,10 +272,7 @@ def transform_to_interactive_code(code: str) -> Any:
             )
 
     ast.fix_missing_locations(tree)
-    try:
-        return compile(tree, "<sandbox>", "exec")
-    except Exception:
-        return code
+    return compile(tree, "<sandbox>", "exec")
 
 
 def isolated_worker(
@@ -277,6 +295,18 @@ def isolated_worker(
     else:
         sys.stdout = io.StringIO()
 
+    def get_captured_output() -> str:
+        """Retrieve captured stdout from file or in-memory StringIO buffer."""
+        if out_file and output_filepath:
+            out_file.flush()
+            try:
+                return Path(output_filepath).read_text(encoding="utf-8")
+            except Exception:
+                return ""
+        if isinstance(sys.stdout, io.StringIO):
+            return sys.stdout.getvalue()
+        return ""
+
     try:
         apply_system_limits(config)
         safe_env = create_safe_environment(config, tools)
@@ -284,53 +314,34 @@ def isolated_worker(
         executable_code = transform_to_interactive_code(code)
         exec(executable_code, safe_env)
 
-        if out_file and output_filepath:
-            out_file.flush()
-            captured = Path(output_filepath).read_text(encoding="utf-8")
-        else:
-            captured = (
-                sys.stdout.getvalue()
-                if hasattr(sys.stdout, "getvalue")
-                else ""
-            )
-
-        result = {
+        result: dict[str, Any] = {
             "status": "success",
-            "output": captured,
+            "output": get_captured_output(),
         }
 
     except FinalAnswerException as error:
-        if out_file and output_filepath:
-            out_file.flush()
-            captured = Path(output_filepath).read_text(encoding="utf-8")
-        else:
-            captured = (
-                sys.stdout.getvalue()
-                if hasattr(sys.stdout, "getvalue")
-                else ""
-            )
-
         result = {
             "status": "final_answer",
             "answer": error.answer,
-            "output": captured,
+            "output": get_captured_output(),
+        }
+    except KeyboardInterrupt:
+        result = {
+            "status": "keyboard_interrupt",
+            "output": get_captured_output(),
+        }
+    except SystemExit as error:
+        result = {
+            "status": "system_exit",
+            "code": error.code,
+            "output": get_captured_output(),
         }
     except Exception as error:
-        if out_file and output_filepath:
-            out_file.flush()
-            captured = Path(output_filepath).read_text(encoding="utf-8")
-        else:
-            captured = (
-                sys.stdout.getvalue()
-                if hasattr(sys.stdout, "getvalue")
-                else ""
-            )
-
         result = {
             "status": "error",
             "error": traceback.format_exc(),
             "error_type": type(error).__name__,
-            "output": captured,
+            "output": get_captured_output(),
         }
     finally:
         sys.stdout = original_stdout
@@ -352,6 +363,7 @@ class SandboxExecutor:
         self.tool_wrappers: dict[str, Any] = {}
         self.mcp_client: Any = None
         self.tools = self.get_tools_manual()
+        self._current_process: multiprocessing.Process | None = None
 
     def connect_mcp(
         self,
@@ -386,7 +398,14 @@ class SandboxExecutor:
         return generate_tools_manual(mcp_tools)
 
     def close(self) -> None:
-        """Stop the MCP client if one is connected."""
+        """Stop the MCP client and terminate any running worker process."""
+        if self._current_process and self._current_process.is_alive():
+            try:
+                self._current_process.terminate()
+                self._current_process.join(timeout=1)
+            except Exception:
+                pass
+            self._current_process = None
         if self.mcp_client:
             self.mcp_client.stop()
             self.mcp_client = None
@@ -397,6 +416,7 @@ class SandboxExecutor:
         tools: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute code in a worker process and return its result."""
+        import signal
         import tempfile
 
         # MCP wrappers and caller-provided tools are available in the worker.
@@ -413,8 +433,20 @@ class SandboxExecutor:
             target=isolated_worker,
             args=(code, self.config, result_queue, merged_tools, str(tmp_path)),
         )
-        process.start()
-        process.join(timeout=self.config.max_execution_time_seconds)
+        self._current_process = process
+
+        try:
+            process.start()
+            process.join(timeout=self.config.max_execution_time_seconds)
+        except KeyboardInterrupt:
+            if process.is_alive():
+                process.terminate()
+                process.join()
+            tmp_path.unlink(missing_ok=True)
+            self._current_process = None
+            raise
+        finally:
+            self._current_process = None
 
         if process.is_alive():
             process.terminate()
@@ -440,7 +472,20 @@ class SandboxExecutor:
             pass
 
         if not result_queue.empty():
-            return cast(dict[str, Any], result_queue.get())
+            res = cast(dict[str, Any], result_queue.get())
+            status = res.get("status")
+            if status == "keyboard_interrupt":
+                raise KeyboardInterrupt()
+            if status == "system_exit":
+                return {
+                    "status": "error",
+                    "error": f"SystemExit({res.get('code')}) called.",
+                    "output": res.get("output", ""),
+                }
+            return res
+
+        if process.exitcode in (-signal.SIGINT, 130):
+            raise KeyboardInterrupt()
 
         return {
             "status": "error",

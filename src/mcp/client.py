@@ -65,14 +65,21 @@ class MCPClient:
                 f"MCP server closed unexpectedly. Stderr: {err}"
             )
 
-        response = json.loads(response_line)
+        try:
+            response = json.loads(response_line)
+        except Exception as e:
+            err = self.process.stderr.read() if self.process.stderr else ""
+            raise RuntimeError(
+                f"Invalid JSON from MCP server ({e}): '{response_line.strip()}'. Stderr: {err}"
+            ) from e
+
         if "error" in response:
             raise RuntimeError(f"MCP Error: {response['error']}")
         return cast(dict[str, Any], response.get("result", {}))
 
     def _initialize(self) -> None:
         """Initialize the MCP session and query available tools, resources, and prompts."""
-        self._send_request(
+        init_res = self._send_request(
             "initialize",
             {
                 "protocolVersion": "2024-11-05",
@@ -83,15 +90,18 @@ class MCPClient:
                 },
             },
         )
+        capabilities = init_res.get("capabilities", {})
         self.list_tools()
-        try:
-            self.list_resources()
-        except Exception:
-            pass
-        try:
-            self.list_prompts()
-        except Exception:
-            pass
+        if "resources" in capabilities:
+            try:
+                self.list_resources()
+            except Exception:
+                pass
+        if "prompts" in capabilities:
+            try:
+                self.list_prompts()
+            except Exception:
+                pass
 
     def list_tools(self) -> list[dict[str, Any]]:
         """Query the MCP server for available tools."""
@@ -188,19 +198,21 @@ class HttpMCPClient:
         }
         headers = {"Content-Type": "application/json"}
 
-        resp = requests.post(
-            self.server_url, json=payload, headers=headers, timeout=30
-        )
-        resp.raise_for_status()
-
-        data = resp.json()
+        try:
+            resp = requests.post(
+                self.server_url, json=payload, headers=headers, timeout=30
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            raise RuntimeError(f"MCP HTTP request failed: {e}") from e
         if "error" in data:
             raise RuntimeError(f"MCP HTTP Error: {data['error']}")
         return cast(dict[str, Any], data.get("result", {}))
 
     def start(self) -> None:
         """Initialize the HTTP MCP session."""
-        self._send_request(
+        init_res = self._send_request(
             "initialize",
             {
                 "protocolVersion": "2024-11-05",
@@ -211,15 +223,18 @@ class HttpMCPClient:
                 },
             },
         )
+        capabilities = init_res.get("capabilities", {})
         self.list_tools()
-        try:
-            self.list_resources()
-        except Exception:
-            pass
-        try:
-            self.list_prompts()
-        except Exception:
-            pass
+        if "resources" in capabilities:
+            try:
+                self.list_resources()
+            except Exception:
+                pass
+        if "prompts" in capabilities:
+            try:
+                self.list_prompts()
+            except Exception:
+                pass
 
     def list_tools(self) -> list[dict[str, Any]]:
         """Query the remote HTTP MCP server for available tools."""

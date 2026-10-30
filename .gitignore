@@ -42,7 +42,9 @@ htmlcov/
 .nox/
 .coverage
 .coverage.*
-.cache
+.cache/
+cache/
+evaluations/
 nosetests.xml
 coverage.xml
 *.cover
@@ -218,3 +220,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Benchmark scripts
+generate_charts.py
+run_benchmark.py
+/moulinette
+
