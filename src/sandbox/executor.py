@@ -237,10 +237,22 @@ def transform_to_interactive_code(code: str) -> Any:
     Any
         Compiled code object ready for exec, or original code if parsing fails.
     """
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return code
+    tree = ast.parse(code)
+    forbidden_dunders = {
+        "__globals__", "__class__", "__subclasses__",
+        "__builtins__", "__code__", "__closure__",
+        "__dict__", "__bases__", "__mro__"
+    }
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in forbidden_dunders:
+            raise PermissionError(
+                f"Sandbox security: access to '{node.attr}' is forbidden."
+            )
+        elif isinstance(node, ast.Name) and node.id in forbidden_dunders:
+            raise PermissionError(
+                f"Sandbox security: access to '{node.id}' is forbidden."
+            )
 
     for node in tree.body:
         # Wrap standalone top-level function/tool calls
@@ -260,10 +272,7 @@ def transform_to_interactive_code(code: str) -> Any:
             )
 
     ast.fix_missing_locations(tree)
-    try:
-        return compile(tree, "<sandbox>", "exec")
-    except Exception:
-        return code
+    return compile(tree, "<sandbox>", "exec")
 
 
 def isolated_worker(
@@ -468,8 +477,11 @@ class SandboxExecutor:
             if status == "keyboard_interrupt":
                 raise KeyboardInterrupt()
             if status == "system_exit":
-                code_val = res.get("code")
-                raise SystemExit(code_val)
+                return {
+                    "status": "error",
+                    "error": f"SystemExit({res.get('code')}) called.",
+                    "output": res.get("output", ""),
+                }
             return res
 
         if process.exitcode in (-signal.SIGINT, 130):
