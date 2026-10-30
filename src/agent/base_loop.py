@@ -221,3 +221,22 @@ class BaseAgentLoop:
             error=error,
         )
         return self.failure_return_value
+
+    def handle_shutdown(
+        self,
+        exc: BaseException,
+        steps_metric: list[StepMetrics],
+        start_time: float,
+    ) -> None:
+        """Perform proper shutdown when program flow exceptions occur."""
+        exc_name = type(exc).__name__
+        print(
+            f"\n🛑 Execution interrupted by {exc_name}. "
+            "Performing proper agent loop shutdown..."
+        )
+        self._save_failure(
+            steps_metric,
+            start_time,
+            error=f"Execution interrupted by {exc_name}",
+        )
+        self.sandbox.close()
