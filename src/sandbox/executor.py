@@ -307,6 +307,12 @@ def isolated_worker(
             "answer": error.answer,
             "output": get_captured_output(),
         }
+    except (KeyboardInterrupt, SystemExit) as error:
+        result = {
+            "status": "fatal_interrupt",
+            "error_type": type(error).__name__,
+            "output": get_captured_output(),
+        }
     except Exception as error:
         result = {
             "status": "error",
@@ -422,7 +428,13 @@ class SandboxExecutor:
             pass
 
         if not result_queue.empty():
-            return cast(dict[str, Any], result_queue.get())
+            res = cast(dict[str, Any], result_queue.get())
+            if res.get("status") == "fatal_interrupt":
+                if res["error_type"] == "KeyboardInterrupt":
+                    raise KeyboardInterrupt("Interruption from sandbox")
+                elif res["error_type"] == "SystemExit":
+                    raise SystemExit("SystemExit from sandbox")
+            return res
 
         return {
             "status": "error",
