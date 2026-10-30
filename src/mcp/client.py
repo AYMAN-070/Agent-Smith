@@ -174,6 +174,7 @@ class HttpMCPClient:
         """Initialize HTTP MCP client with target server URL."""
         self.server_url = server_url.rstrip("/")
         self._request_id = 0
+        self.session_id: str | None = None
         self.tools: list[dict[str, Any]] = []
         self.resources: list[dict[str, Any]] = []
         self.prompts: list[dict[str, Any]] = []
@@ -187,6 +188,7 @@ class HttpMCPClient:
         self, method: str, params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Send a JSON-RPC 2.0 POST request over HTTP."""
+        import json
         import requests
 
         req_id = self._next_id()
@@ -196,14 +198,35 @@ class HttpMCPClient:
             "method": method,
             "params": params if params is not None else {},
         }
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if self.session_id:
+            headers["mcp-session-id"] = self.session_id
 
         try:
             resp = requests.post(
                 self.server_url, json=payload, headers=headers, timeout=30
             )
             resp.raise_for_status()
-            data = resp.json()
+
+            # Update session ID if provided by server
+            resp_session_id = resp.headers.get("mcp-session-id")
+            if resp_session_id:
+                self.session_id = resp_session_id
+
+            try:
+                data = resp.json()
+            except Exception:
+                # Fallback for Server-Sent Events (SSE) format
+                data = None
+                for line in resp.text.splitlines():
+                    if line.startswith("data:"):
+                        data = json.loads(line[5:].strip())
+                        break
+                if data is None:
+                    raise RuntimeError(f"Could not parse MCP HTTP response: {resp.text}")
         except Exception as e:
             raise RuntimeError(f"MCP HTTP request failed: {e}") from e
         if "error" in data:

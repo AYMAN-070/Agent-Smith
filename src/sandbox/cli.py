@@ -132,7 +132,26 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        run_interactive_repl(executor)
+        if not sys.stdin.isatty():
+            code = sys.stdin.read()
+            if code.strip():
+                result = executor.execute(code)
+                status = result.get("status")
+                out = result.get("output", "")
+                if out:
+                    print(out, end="" if out.endswith("\n") else "\n")
+                if status == "final_answer":
+                    print(f"final_answer captured: {result.get('answer')}")
+                elif status == "error":
+                    raw_error = result.get("error", "").strip()
+                    error_line = (
+                        raw_error.splitlines()[-1]
+                        if raw_error
+                        else "Unknown execution error"
+                    )
+                    print(f"Error: {error_line}", file=sys.stderr)
+        else:
+            run_interactive_repl(executor)
     finally:
         executor.close()
 

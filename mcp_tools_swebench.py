@@ -7,10 +7,13 @@ import sys
 from pathlib import Path
 
 try:
-    from fastmcp import FastMCP
-except Exception as err:
-    print(f"Error importing FastMCP: {err}", file=sys.stderr)
-    sys.exit(1)
+    from mcp.server.fastmcp import FastMCP
+except ImportError:
+    try:
+        from fastmcp import FastMCP
+    except Exception as err:
+        print(f"Error importing FastMCP: {err}", file=sys.stderr)
+        sys.exit(1)
 
 try:
     mcp = FastMCP("SWE MCP Server")
@@ -27,6 +30,19 @@ CONTAINER_ID = os.environ.get("SWE_CONTAINER_ID") or os.environ.get(
 TESTBED_PATH = os.environ.get(
     "TESTBED_PATH", "/testbed" if Path("/testbed").exists() else "."
 )
+
+
+def _resolve_testbed_path(p: str | Path) -> Path:
+    """Resolve path relative to TESTBED_PATH, mapping /testbed to TESTBED_PATH."""
+    p_str = str(p)
+    if p_str == "/testbed":
+        return Path(TESTBED_PATH).resolve()
+    if p_str.startswith("/testbed/"):
+        return (Path(TESTBED_PATH) / p_str[len("/testbed/"):]).resolve()
+    path = Path(p)
+    if not path.is_absolute():
+        return (Path(TESTBED_PATH) / path).resolve()
+    return path.resolve()
 
 
 def _docker_exec(
@@ -115,9 +131,7 @@ def read_file(filepath: str, start_line: int, end_line: int) -> str:
         except Exception as e:
             return f"Error reading file '{filepath}': {e}"
 
-    path = Path(filepath)
-    if not path.is_absolute():
-        path = Path(TESTBED_PATH) / path
+    path = _resolve_testbed_path(filepath)
     if not path.is_file():
         return f"Error: File '{filepath}' not found."
 
@@ -177,9 +191,7 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
         except Exception as e:
             return f"Error writing file '{filepath}': {e}"
 
-    path = Path(filepath)
-    if not path.is_absolute():
-        path = Path(TESTBED_PATH) / path
+    path = _resolve_testbed_path(filepath)
     if not path.is_file():
         return f"Error: File '{filepath}' not found."
 
@@ -257,9 +269,7 @@ else:
             return f"Error listing files: {e}"
 
     try:
-        path = Path(directory)
-        if not path.is_absolute():
-            path = Path(TESTBED_PATH) / path
+        path = _resolve_testbed_path(directory)
         if not path.exists() or not path.is_dir():
             return f"Error: '{directory}' does not exist or is not a directory."
 
@@ -623,11 +633,9 @@ def run_command(command: str, workdir: str = "") -> str:
             return f"Error running command in container: {e}"
 
     if not workdir:
-        cwd = Path(TESTBED_PATH)
+        cwd = Path(TESTBED_PATH).resolve()
     else:
-        cwd = Path(workdir)
-        if not cwd.is_absolute():
-            cwd = Path(TESTBED_PATH) / cwd
+        cwd = _resolve_testbed_path(workdir)
 
     if not cwd.exists() or not cwd.is_dir():
         return (
