@@ -148,7 +148,7 @@ class Provider:
                         }
                         if "openrouter" in provider["base_url"]:
                             headers["HTTP-Referer"] = (
-                                "https://github.com/agent-smith"
+                                "https://example.com/agent-smith"
                             )
                             headers["X-Title"] = "Agent-Smith"
 

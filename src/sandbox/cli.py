@@ -53,6 +53,30 @@ def load_config(config_path: str | None) -> SandboxConfig:
 
 def run_interactive_repl(executor: SandboxExecutor) -> None:
     """Runs the Read-Eval-Print Loop (REPL) for the sandbox in an isolated worker process."""
+    if not sys.stdin.isatty():
+        full_code = sys.stdin.read()
+        if not full_code.strip():
+            return
+        result = executor.execute(full_code)
+        status = result.get("status")
+        if status == "final_answer":
+            print(f"final_answer captured: {result.get('answer')}")
+        elif status == "error":
+            raw_error = result.get("error", "").strip()
+            error_line = (
+                raw_error.splitlines()[-1]
+                if raw_error
+                else "Unknown execution error"
+            )
+            print(f"Error: {error_line}", file=sys.stderr)
+            partial = result.get("output", "")
+            if partial:
+                print(partial, end="" if partial.endswith("\n") else "\n")
+        else:
+            out = result.get("output", "")
+            if out:
+                print(out, end="" if out.endswith("\n") else "\n")
+        return
 
     print("=== Agent Smith Interactive Sandbox ===")
     print("Type 'exit' or use Ctrl+D to quit.")

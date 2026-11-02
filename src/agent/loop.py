@@ -193,9 +193,9 @@ class SWEAgentLoop(BaseAgentLoop):
             model_name=model_name,
             provider_url=provider_url,
         )
-        self.issue_description = task.problem_statement
+        self.bug_description = task.problem_statement
         self.prompt = SWEPromptBuilder(
-            self.issue_description, tools_manual=sandbox.tools
+            self.bug_description, tools_manual=sandbox.tools
         )
         self.docker_container = docker_container
 
@@ -215,7 +215,7 @@ class SWEAgentLoop(BaseAgentLoop):
                 print(f"Error removing container during shutdown: {e}")
 
     def run(self) -> str:
-        """Execute the iterative loop to resolve the SWE-bench issue."""
+        """Execute the iterative loop to resolve the SWE-bench bug."""
         start_time = time.time()
         steps_metric: list[StepMetrics] = []
         max_loop = self.rules.iterations

@@ -36,7 +36,7 @@ RESOURCES_SCHEMA = [
     }
 ]
 
-PROMPTS_SCHEMA = [
+prompts_schema = [
     {
         "name": "solve_mbpp_task",
         "description": "Template prompt to guide solving an MBPP algorithmic task",
@@ -168,6 +168,14 @@ def handle_request(line: str) -> None:
         if method == "notifications/initialized":
             return
 
+        if method == "ping":
+            send_response({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {}
+            })
+            return
+
         # List available tools
         if method == "tools/list":
             send_response(
@@ -272,7 +280,7 @@ def handle_request(line: str) -> None:
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": {
-                        "prompts": PROMPTS_SCHEMA,
+                        "prompts": prompts_schema,
                     },
                 }
             )

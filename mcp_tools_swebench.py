@@ -10,7 +10,7 @@ try:
     from mcp.server.fastmcp import FastMCP
 except ImportError:
     try:
-        from fastmcp import FastMCP
+        from fastmcp import FastMCP  # type: ignore[no-redef,import-not-found]
     except Exception as err:
         print(f"Error importing FastMCP: {err}", file=sys.stderr)
         sys.exit(1)
@@ -38,7 +38,7 @@ def _resolve_testbed_path(p: str | Path) -> Path:
     if p_str == "/testbed":
         return Path(TESTBED_PATH).resolve()
     if p_str.startswith("/testbed/"):
-        return (Path(TESTBED_PATH) / p_str[len("/testbed/"):]).resolve()
+        return (Path(TESTBED_PATH) / p_str[len("/testbed/") :]).resolve()
     path = Path(p)
     if not path.is_absolute():
         return (Path(TESTBED_PATH) / path).resolve()
@@ -87,9 +87,9 @@ def get_swebench_guidelines() -> str:
 
 @mcp.prompt()
 def debug_swebench_issue(issue_description: str) -> str:
-    """Template prompt to guide reproducing and fixing a SWE-bench issue."""
+    """Template prompt to guide reproducing and fixing a bug."""
     return (
-        f"You are tasked with fixing the following issue:\n\n{issue_description}\n\n"
+        f"You are tasked with fixing the following bug:\n\n{issue_description}\n\n"
         "Follow these steps:\n"
         "1. Locate relevant code files.\n"
         "2. Reproduce the issue with tests.\n"
@@ -174,6 +174,7 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
             if filepath.endswith(".py"):
                 try:
                     import ast
+
                     ast.parse(data)
                 except SyntaxError as e:
                     syntax_notice = (
@@ -209,6 +210,7 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
     if filepath.endswith(".py"):
         try:
             import ast
+
             ast.parse(data)
         except SyntaxError as e:
             syntax_notice = (
@@ -271,7 +273,9 @@ else:
     try:
         path = _resolve_testbed_path(directory)
         if not path.exists() or not path.is_dir():
-            return f"Error: '{directory}' does not exist or is not a directory."
+            return (
+                f"Error: '{directory}' does not exist or is not a directory."
+            )
 
         matched_files = []
         testbed_base = Path(TESTBED_PATH).resolve()
@@ -279,7 +283,9 @@ else:
             if not p.is_file() or ".git" in p.parts:
                 continue
             try:
-                matched_files.append(str(p.resolve().relative_to(testbed_base)))
+                matched_files.append(
+                    str(p.resolve().relative_to(testbed_base))
+                )
             except ValueError:
                 matched_files.append(str(p.resolve()))
 
@@ -379,7 +385,7 @@ def search_function_or_class_definition_in_code(name: str) -> str:
       - name: Exact function or class name to locate.
     """
     pattern = rf"^\s*(?:async\s+def|def|class)\s+{re.escape(name)}\b"
-    return search_code(pattern=pattern, file_pattern="*.py")
+    return str(search_code(pattern=pattern, file_pattern="*.py"))
 
 
 @mcp.tool()
@@ -469,7 +475,9 @@ else:
 
             resolved_file = file_path.resolve()
             try:
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                with open(
+                    file_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
                     for line_nb, line_content in enumerate(f, start=1):
                         if (
                             def_path
@@ -682,7 +690,10 @@ if __name__ == "__main__":
             help="MCP transport protocol",
         )
         parser.add_argument(
-            "--port", type=int, default=8000, help="Port for HTTP/SSE transport"
+            "--port",
+            type=int,
+            default=8000,
+            help="Port for HTTP/SSE transport",
         )
         args, _ = parser.parse_known_args()
 
@@ -690,7 +701,7 @@ if __name__ == "__main__":
             CONTAINER_ID = args.container_id
 
         if args.transport in ("sse", "streamable-http"):
-            mcp.run(transport=args.transport, port=args.port)
+            getattr(mcp, "run")(transport=args.transport, port=args.port)
         else:
             mcp.run(transport="stdio")
     except Exception as err:

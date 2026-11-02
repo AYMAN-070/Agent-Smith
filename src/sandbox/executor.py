@@ -18,6 +18,7 @@ from src.models import SandboxConfig
 
 SAFE_BUILTINS: dict[str, Any] = {
     "print": print,
+    "dir": dir,
     "len": len,
     "range": range,
     "int": int,
@@ -57,6 +58,12 @@ SAFE_BUILTINS: dict[str, Any] = {
     "KeyboardInterrupt": KeyboardInterrupt,
     "RuntimeError": RuntimeError,
     "ImportError": ImportError,
+    "MemoryError": MemoryError,
+    "ZeroDivisionError": ZeroDivisionError,
+    "NameError": NameError,
+    "SyntaxError": SyntaxError,
+    "OverflowError": OverflowError,
+    "OSError": OSError,
     "PermissionError": PermissionError,
     "FileNotFoundError": FileNotFoundError,
     "exit": sys.exit,
@@ -189,7 +196,6 @@ def apply_network_block() -> None:
     import socket
 
     LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
-    real_socket = socket.socket
     real_create_conn = socket.create_connection
     real_gai = socket.getaddrinfo
 
@@ -224,8 +230,8 @@ def apply_network_block() -> None:
         raise PermissionError("Sandbox security: network access is forbidden.")
 
     socket.socket = GuardedSocket  # type: ignore[misc]
-    socket.create_connection = guarded_create_connection  # type: ignore[assignment]
-    socket.getaddrinfo = guarded_getaddrinfo  # type: ignore[assignment]
+    socket.create_connection = guarded_create_connection
+    socket.getaddrinfo = guarded_getaddrinfo
 
     for attr in (
         "gethostbyname",
