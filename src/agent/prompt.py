@@ -49,7 +49,10 @@ class PromptBuilder:
             "   - Phase 2 (Submit): In a subsequent step, once you observe that all tests passed, call final_answer.\n"
             "4. TOOL RETURN VALUES:\n"
             "   - `run_tests` returns a JSON string (NOT a dictionary). Do NOT do `res['success']`!\n"
-            "   - Simply use `print(res)` so the test output is captured in the observation.\n\n"
+            "   - Simply use `print(res)` so the test output is captured in the observation.\n"
+            "5. TEST INTEGRITY & TIE-BREAKING RULES:\n"
+            "   - NEVER alter, weaken, or modify the provided assertions in `tests` (e.g. NEVER change `==` to `in`, do not alter expected return values).\n"
+            "   - If multiple elements share the same frequency, extremum, or count, the task expects the first one occurring in the original input.\n\n"
             "PATTERN 1 - Testing your candidate solution:\n"
             "```python\n"
             "candidate = '''\n"
@@ -193,7 +196,11 @@ class SWEPromptBuilder:
             "4. When using `edit_file`, `old_str` must be exact code WITHOUT line numbers from `read_file`.\n"
             "5. Make minimal changes: do not reformat unrelated code or rewrite working functions.\n"
             "6. Use relative paths from repository root (e.g. 'src/module.py').\n"
-            "7. To test, ALWAYS use `run_tests()`. NEVER run `pip install` or modify the environment (this will break package dependencies).\n"
+            "7. STRICT TESTING RULES:\n"
+            "   - To test and verify your fix, ALWAYS and ONLY use `print(run_tests())`.\n"
+            "   - NEVER use `run_command('pytest ...')`, `unittest`, or bash to run tests. Only `run_tests()` executes the official SWE-bench evaluation benchmark.\n"
+            "   - NEVER edit files in test suites (e.g. inside `tests/` or files named `test_*.py`). The evaluation strictly tests your fix against original repo tests.\n"
+            "   - NEVER run `pip install` or modify the environment (this will break package dependencies).\n"
             "8. Once your fix is verified, STOP and SUBMIT: inspect with `print(get_patch())` then call `final_answer(get_patch())`.\n"
             "   Do NOT look for new bugs or attempt endless refactoring.\n"
             "9. NEVER call final_answer and exploration/edit tools in the same script.\n"
@@ -225,7 +232,7 @@ class SWEPromptBuilder:
                 {"role": "system", "content": self.system_instruction},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.2,
+            "temperature": 0.0,
             "max_tokens": 800,
             "top_p": 0.95,
         }
