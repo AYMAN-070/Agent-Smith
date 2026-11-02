@@ -164,7 +164,7 @@ class SandboxOutputHandler:
                 )
 
             if cls.is_test_run_finished(
-                code, observation, has_patch=True, benchmark="mbpp"
+                code, raw_obs, has_patch=True, benchmark="mbpp"
             ):
                 print(
                     "🎯 MBPP tests passed! Forcing agent to submit final_answer."
@@ -217,7 +217,7 @@ class SandboxOutputHandler:
             print(observation if observation else "(No stdout output)")
 
             if cls.is_test_run_finished(
-                code, observation, has_patch=has_patch, benchmark="swebench"
+                code, raw_obs, has_patch=has_patch, benchmark="swebench"
             ):
                 print("🎯 Tests passed! Forcing agent to inspect and submit.")
                 return cls.build_test_success_feedback(observation), True
