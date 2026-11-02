@@ -225,7 +225,7 @@ class SWEPromptBuilder:
                 {"role": "system", "content": self.system_instruction},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.2,
+            "temperature": 0.0,
             "max_tokens": 800,
             "top_p": 0.95,
         }
