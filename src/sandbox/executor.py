@@ -18,6 +18,7 @@ from src.models import SandboxConfig
 
 SAFE_BUILTINS: dict[str, Any] = {
     "print": print,
+    "dir": dir,
     "len": len,
     "range": range,
     "int": int,
@@ -57,6 +58,12 @@ SAFE_BUILTINS: dict[str, Any] = {
     "KeyboardInterrupt": KeyboardInterrupt,
     "RuntimeError": RuntimeError,
     "ImportError": ImportError,
+    "MemoryError": MemoryError,
+    "ZeroDivisionError": ZeroDivisionError,
+    "NameError": NameError,
+    "SyntaxError": SyntaxError,
+    "OverflowError": OverflowError,
+    "OSError": OSError,
     "PermissionError": PermissionError,
     "FileNotFoundError": FileNotFoundError,
     "exit": sys.exit,
@@ -69,6 +76,7 @@ SAFE_BUILTINS: dict[str, Any] = {
     "NotImplementedError": NotImplementedError,
     "StopIteration": StopIteration,
     "AssertionError": AssertionError,
+    "bytearray": bytearray,
 }
 
 
@@ -168,48 +176,50 @@ def create_safe_environment(
 
 
 def apply_network_block() -> None:
-    """Disable all inbound and outbound network access in the worker process."""
-
-    class BlockedSocket:
-        """Dummy socket class that disallows all socket instantiations."""
-
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            """Raise PermissionError on socket creation."""
-            raise PermissionError(
-                "Sandbox security: network access is forbidden."
-            )
-
-    def blocked_func(*args: Any, **kwargs: Any) -> Any:
-        """Raise PermissionError on blocked network operations."""
-        raise PermissionError("Sandbox security: network access is forbidden.")
-
+    """Disable external network access in worker, allowing loopback for local MCP."""
     import socket
 
-    for attr in (
-        "create_connection",
-        "getaddrinfo",
-        "gethostbyname",
-        "gethostbyname_ex",
-        "getnameinfo",
-        "socketpair",
-        "fromfd",
-    ):
-        setattr(socket, attr, blocked_func)
-    setattr(socket, "socket", BlockedSocket)
+    orig_getaddrinfo = socket.getaddrinfo
 
-    try:
-        import _socket
+    def safe_getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
+        host_str = str(host).lower()
+        if host_str in ("localhost", "127.0.0.1", "::1"):
+            return orig_getaddrinfo(host, *args, **kwargs)
+        raise PermissionError(
+            f"Sandbox security: network access to '{host}' is forbidden."
+        )
 
-        for attr in (
-            "getaddrinfo",
-            "gethostbyname",
-            "gethostbyname_ex",
-            "getnameinfo",
-        ):
-            setattr(_socket, attr, blocked_func)
-        setattr(_socket, "socket", BlockedSocket)
-    except (ImportError, AttributeError):
-        pass
+    orig_create_connection = socket.create_connection
+
+    def safe_create_connection(address: Any, *args: Any, **kwargs: Any) -> Any:
+        host = (
+            str(address[0]).lower()
+            if isinstance(address, (tuple, list)) and address
+            else ""
+        )
+        if host in ("localhost", "127.0.0.1", "::1"):
+            return orig_create_connection(address, *args, **kwargs)
+        raise PermissionError(
+            f"Sandbox security: network connection to '{host}' is forbidden."
+        )
+
+    orig_socket_connect = socket.socket.connect
+
+    def safe_connect(self: Any, address: Any) -> Any:
+        host = (
+            str(address[0]).lower()
+            if isinstance(address, (tuple, list)) and address
+            else ""
+        )
+        if host in ("localhost", "127.0.0.1", "::1"):
+            return orig_socket_connect(self, address)
+        raise PermissionError(
+            f"Sandbox security: network connection to '{host}' is forbidden."
+        )
+
+    socket.getaddrinfo = safe_getaddrinfo  # type: ignore[assignment]
+    socket.create_connection = safe_create_connection  # type: ignore[assignment]
+    socket.socket.connect = safe_connect  # type: ignore[assignment]
 
 
 def apply_system_limits(config: SandboxConfig) -> None:

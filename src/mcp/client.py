@@ -174,6 +174,7 @@ class HttpMCPClient:
         """Initialize HTTP MCP client with target server URL."""
         self.server_url = server_url.rstrip("/")
         self._request_id = 0
+        self.session_id: str | None = None
         self.tools: list[dict[str, Any]] = []
         self.resources: list[dict[str, Any]] = []
         self.prompts: list[dict[str, Any]] = []
@@ -196,14 +197,31 @@ class HttpMCPClient:
             "method": method,
             "params": params if params is not None else {},
         }
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream, */*"
+        }
+        if self.session_id:
+            headers["mcp-session-id"] = self.session_id
 
         try:
             resp = requests.post(
                 self.server_url, json=payload, headers=headers, timeout=30
             )
+            if "mcp-session-id" in resp.headers:
+                self.session_id = resp.headers["mcp-session-id"]
             resp.raise_for_status()
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception:
+                # Support SSE / streamable-http format (data: {...})
+                data = None
+                for line in resp.text.splitlines():
+                    if line.startswith("data:"):
+                        data = json.loads(line[5:].strip())
+                        break
+                if data is None:
+                    raise
         except Exception as e:
             raise RuntimeError(f"MCP HTTP request failed: {e}") from e
         if "error" in data:

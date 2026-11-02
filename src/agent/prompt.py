@@ -151,20 +151,20 @@ class PromptBuilder:
 
 
 class SWEPromptBuilder:
-    """Constructs and manages prompts for SWE-bench issue resolution."""
+    """Constructs and manages prompts for SWE-bench bug resolution."""
 
     def __init__(
         self,
-        issue_description: str,
+        bug_description: str,
         tools_manual: str | None = None,
     ) -> None:
-        """Initialize SWE prompt builder with issue description and optional tools manual."""
-        self.issue_description = issue_description
+        """Initialize SWE prompt builder with bug description and optional tools manual."""
+        self.bug_description = bug_description
         self.tools_manual = tools_manual
         self.build_initial_payload()
 
     def build_initial_payload(self) -> None:
-        """Construct initial system instruction and issue statement payload."""
+        """Construct initial system instruction and bug statement payload."""
         manual_section = self.tools_manual or (
             "AVAILABLE TOOLS:\n"
             "- read_file(filepath: str, start_line: int, end_line: int) -> str\n"
@@ -177,13 +177,13 @@ class SWEPromptBuilder:
             "- final_answer(patch_diff: str)"
         )
         self.system_instruction = (
-            "You are an autonomous Software Engineer Agent solving real-world GitHub issues.\n"
+            "You are an autonomous Software Engineer Agent solving real-world software bugs.\n"
             "You operate in a secure Python sandbox attached to the project's repository.\n\n"
             f"{manual_section}\n\n"
             "WORKFLOW GUIDELINES:\n"
             "1. LOCATE: Use `search_code` and `read_file` to locate the exact source of the bug.\n"
             "2. EDIT: Use `edit_file` to apply a minimal, surgical fix.\n"
-            "3. VERIFY: Run `run_tests()` to confirm the issue is fixed and no regressions occur.\n"
+            "3. VERIFY: Run `run_tests()` to confirm the bug is fixed and no regressions occur.\n"
             "4. SUBMIT: Check `print(get_patch())` to verify your diff, then call `final_answer(get_patch())`.\n\n"
             "CRITICAL EXECUTION RULES:\n"
             "1. All tools are callable directly as global Python functions (no import required).\n"
@@ -195,7 +195,7 @@ class SWEPromptBuilder:
             "6. Use relative paths from repository root (e.g. 'src/module.py').\n"
             "7. To test, ALWAYS use `run_tests()`. NEVER run `pip install` or modify the environment (this will break package dependencies).\n"
             "8. Once your fix is verified, STOP and SUBMIT: inspect with `print(get_patch())` then call `final_answer(get_patch())`.\n"
-            "   Do NOT look for new issues or attempt endless refactoring.\n"
+            "   Do NOT look for new bugs or attempt endless refactoring.\n"
             "9. NEVER call final_answer and exploration/edit tools in the same script.\n"
             "10. BREVITY IS MANDATORY: Output ONLY the minimal executable Python code block in ```python ... ``` without any natural language explanations, prose, or chatter.\n\n"
             "EXAMPLE - Investigating the repository:\n"
@@ -211,10 +211,10 @@ class SWEPromptBuilder:
         )
 
         user_content = (
-            f"ISSUE DESCRIPTION:\n{self.issue_description}\n\n"
+            f"BUG DESCRIPTION:\n{self.bug_description}\n\n"
             "INSTRUCTIONS:\n"
             "1. Locate the bug using `search_code` and `read_file`.\n"
-            "2. DO NOT run Python snippets from the issue with `import`.\n"
+            "2. DO NOT run Python snippets from the bug description with `import`.\n"
             "3. Apply your fix with `edit_file`.\n"
             "4. Verify with `run_tests()`.\n"
             "5. Submit your fix with `final_answer(get_patch())`."
