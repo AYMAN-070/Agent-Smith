@@ -1,11 +1,25 @@
-"""SWE-bench development and testing tools MCP server."""
+"""FastMCP server exposing SWE-bench development and testing tools."""
 
-import json
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    from mcp.server.fastmcp import FastMCP
+except ImportError:
+    try:
+        from fastmcp import FastMCP  # type: ignore[no-redef,import-not-found]
+    except Exception as err:
+        print(f"Error importing FastMCP: {err}", file=sys.stderr)
+        sys.exit(1)
+
+try:
+    mcp = FastMCP("SWE MCP Server")
+except Exception as err:
+    print(f"Error initializing FastMCP: {err}", file=sys.stderr)
+    sys.exit(1)
 
 # Docker container ID for SWE-bench (if running against a container)
 CONTAINER_ID = os.environ.get("SWE_CONTAINER_ID") or os.environ.get(
@@ -19,17 +33,16 @@ TESTBED_PATH = os.environ.get(
 
 
 def _resolve_testbed_path(p: str | Path) -> Path:
-    """Resolve a file or directory path against TESTBED_PATH."""
+    """Resolve path relative to TESTBED_PATH, mapping /testbed to TESTBED_PATH."""
+    p_str = str(p)
+    if p_str == "/testbed":
+        return Path(TESTBED_PATH).resolve()
+    if p_str.startswith("/testbed/"):
+        return (Path(TESTBED_PATH) / p_str[len("/testbed/") :]).resolve()
     path = Path(p)
-    if str(path).startswith("/testbed") and not Path("/testbed").exists():
-        try:
-            rel = path.relative_to("/testbed")
-            return Path(TESTBED_PATH) / rel
-        except ValueError:
-            pass
     if not path.is_absolute():
-        return Path(TESTBED_PATH) / path
-    return path
+        return (Path(TESTBED_PATH) / path).resolve()
+    return path.resolve()
 
 
 def _docker_exec(
@@ -55,6 +68,7 @@ def _docker_exec(
     )
 
 
+@mcp.resource("swebench://guidelines")
 def get_swebench_guidelines() -> str:
     """Return instructions and guidelines for solving SWE-bench tasks."""
     return (
@@ -71,22 +85,21 @@ def get_swebench_guidelines() -> str:
     )
 
 
-def debug_swebench_bug(bug_description: str) -> str:
+@mcp.prompt()
+def debug_swebench_issue(issue_description: str) -> str:
     """Template prompt to guide reproducing and fixing a bug."""
     return (
-        f"You are tasked with fixing the following bug:\n\n{bug_description}\n\n"
+        f"You are tasked with fixing the following bug:\n\n{issue_description}\n\n"
         "Follow these steps:\n"
         "1. Locate relevant code files.\n"
-        "2. Reproduce the bug with tests.\n"
+        "2. Reproduce the issue with tests.\n"
         "3. Edit files to fix the bug.\n"
         "4. Verify the fix and submit using final_answer(get_patch())."
     )
 
 
-debug_swebench_issue = debug_swebench_bug
-
-
 # File System Tools
+@mcp.tool()
 def read_file(filepath: str, start_line: int, end_line: int) -> str:
     """Read a file range with 1-indexed line numbers.
 
@@ -135,6 +148,7 @@ def read_file(filepath: str, start_line: int, end_line: int) -> str:
         return f"Error reading file '{filepath}': {e}"
 
 
+@mcp.tool()
 def edit_file(filepath: str, old_str: str, new_str: str) -> str:
     """Replace an exact unique code block in a file with new code.
 
@@ -160,6 +174,7 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
             if filepath.endswith(".py"):
                 try:
                     import ast
+
                     ast.parse(data)
                 except SyntaxError as e:
                     syntax_notice = (
@@ -195,6 +210,7 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
     if filepath.endswith(".py"):
         try:
             import ast
+
             ast.parse(data)
         except SyntaxError as e:
             syntax_notice = (
@@ -209,6 +225,7 @@ def edit_file(filepath: str, old_str: str, new_str: str) -> str:
         return f"Error writing file '{filepath}': {e}"
 
 
+@mcp.tool()
 def list_files(directory: str = ".", pattern: str = "*") -> str:
     """List files in a directory matching a glob pattern.
 
@@ -256,7 +273,9 @@ else:
     try:
         path = _resolve_testbed_path(directory)
         if not path.exists() or not path.is_dir():
-            return f"Error: '{directory}' does not exist or is not a directory."
+            return (
+                f"Error: '{directory}' does not exist or is not a directory."
+            )
 
         matched_files = []
         testbed_base = Path(TESTBED_PATH).resolve()
@@ -264,7 +283,9 @@ else:
             if not p.is_file() or ".git" in p.parts:
                 continue
             try:
-                matched_files.append(str(p.resolve().relative_to(testbed_base)))
+                matched_files.append(
+                    str(p.resolve().relative_to(testbed_base))
+                )
             except ValueError:
                 matched_files.append(str(p.resolve()))
 
@@ -276,6 +297,7 @@ else:
 
 
 # Code Search Tools
+@mcp.tool()
 def search_code(pattern: str, file_pattern: str = "*") -> str:
     """Search for a regex pattern across files in the codebase.
 
@@ -355,6 +377,7 @@ else:
     return "\n".join(results)
 
 
+@mcp.tool()
 def search_function_or_class_definition_in_code(name: str) -> str:
     """Find the definition of a function or class across the codebase.
 
@@ -362,9 +385,10 @@ def search_function_or_class_definition_in_code(name: str) -> str:
       - name: Exact function or class name to locate.
     """
     pattern = rf"^\s*(?:async\s+def|def|class)\s+{re.escape(name)}\b"
-    return search_code(pattern=pattern, file_pattern="*.py")
+    return str(search_code(pattern=pattern, file_pattern="*.py"))
 
 
+@mcp.tool()
 def find_references(name: str, filepath: str, line: int) -> str:
     """Find all usages and references of a symbol across Python files.
 
@@ -451,7 +475,9 @@ else:
 
             resolved_file = file_path.resolve()
             try:
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                with open(
+                    file_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
                     for line_nb, line_content in enumerate(f, start=1):
                         if (
                             def_path
@@ -476,6 +502,7 @@ else:
 
 
 # Execution Tools
+@mcp.tool()
 def run_tests() -> str:
     """Execute the repository test suite in the Docker testbed environment.
 
@@ -523,6 +550,7 @@ def run_tests() -> str:
         return f"Error executing tests: {e}"
 
 
+@mcp.tool()
 def get_patch() -> str:
     """Retrieve the unified git diff of all modifications made to the repo.
 
@@ -570,6 +598,7 @@ def get_patch() -> str:
         return f"Error executing git diff: {e}"
 
 
+@mcp.tool()
 def run_command(command: str, workdir: str = "") -> str:
     """Execute a shell command with the project's conda environment active.
 
@@ -611,7 +640,10 @@ def run_command(command: str, workdir: str = "") -> str:
         except Exception as e:
             return f"Error running command in container: {e}"
 
-    cwd = _resolve_testbed_path(workdir) if workdir else Path(TESTBED_PATH)
+    if not workdir:
+        cwd = Path(TESTBED_PATH).resolve()
+    else:
+        cwd = _resolve_testbed_path(workdir)
 
     if not cwd.exists() or not cwd.is_dir():
         return (
@@ -640,97 +672,38 @@ def run_command(command: str, workdir: str = "") -> str:
         return f"Error running command: {e}"
 
 
-TOOLS_SCHEMA = [
-    {"name": "read_file", "description": "Read a file range", "inputSchema": {"type": "object", "properties": {"filepath": {"type": "string"}, "start_line": {"type": "integer"}, "end_line": {"type": "integer"}}, "required": ["filepath", "start_line", "end_line"]}},
-    {"name": "edit_file", "description": "Replace code", "inputSchema": {"type": "object", "properties": {"filepath": {"type": "string"}, "old_str": {"type": "string"}, "new_str": {"type": "string"}}, "required": ["filepath", "old_str", "new_str"]}},
-    {"name": "list_files", "description": "List files", "inputSchema": {"type": "object", "properties": {"directory": {"type": "string"}, "pattern": {"type": "string"}}, "required": []}},
-    {"name": "search_code", "description": "Search regex", "inputSchema": {"type": "object", "properties": {"pattern": {"type": "string"}, "file_pattern": {"type": "string"}}, "required": ["pattern"]}},
-    {"name": "search_function_or_class_definition_in_code", "description": "Find def", "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}},
-    {"name": "find_references", "description": "Find refs", "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "filepath": {"type": "string"}, "line": {"type": "integer"}}, "required": ["name", "filepath", "line"]}},
-    {"name": "run_tests", "description": "Run tests", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-    {"name": "get_patch", "description": "Get git diff", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-    {"name": "run_command", "description": "Run shell cmd", "inputSchema": {"type": "object", "properties": {"command": {"type": "string"}, "workdir": {"type": "string"}}, "required": ["command"]}}
-]
-
-
-def send_response(response: dict) -> None:
-    sys.stdout.write(json.dumps(response) + "\n")
-    sys.stdout.flush()
-
-
-def handle_request(line: str) -> None:
-    try:
-        req = json.loads(line)
-    except Exception:
-        return
-    req_id = req.get("id")
-    method = req.get("method")
-    params = req.get("params", {})
-
-    if method == "initialize":
-        send_response({"jsonrpc": "2.0", "id": req_id, "result": {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "swebench", "version": "1.0.0"}}})
-        return
-    if method == "notifications/initialized":
-        return
-    if method == "ping":
-        send_response({"jsonrpc": "2.0", "id": req_id, "result": {}})
-        return
-    if method == "tools/list":
-        send_response({"jsonrpc": "2.0", "id": req_id, "result": {"tools": TOOLS_SCHEMA}})
-        return
-    if method == "prompts/list":
-        send_response({"jsonrpc": "2.0", "id": req_id, "result": {"prompts": [{"name": "debug_swebench_bug", "description": "Template prompt to guide reproducing and fixing a bug.", "arguments": [{"name": "bug_description", "description": "Description of the bug", "required": True}]}]}})
-        return
-    if method == "prompts/get":
-        name = params.get("name")
-        if name in ("debug_swebench_bug", "debug_swebench_issue"):
-            desc = params.get("arguments", {}).get("bug_description", "") or params.get("arguments", {}).get("task_description", "") or params.get("arguments", {}).get("issue_description", "")
-            send_response({"jsonrpc": "2.0", "id": req_id, "result": {"description": "Template prompt", "messages": [{"role": "user", "content": {"type": "text", "text": debug_swebench_bug(desc)}}]}})
-        return
-    if method == "resources/list":
-        send_response({"jsonrpc": "2.0", "id": req_id, "result": {"resources": [{"uri": "swebench://guidelines", "name": "SWE-bench Guidelines", "mimeType": "text/markdown"}]}})
-        return
-    if method == "resources/read":
-        uri = params.get("uri")
-        if uri == "swebench://guidelines":
-            send_response({"jsonrpc": "2.0", "id": req_id, "result": {"contents": [{"uri": uri, "mimeType": "text/markdown", "text": get_swebench_guidelines()}]}})
-        return
-    if method == "tools/call":
-        name = params.get("name")
-        args = params.get("arguments", {})
-        try:
-            if name == "read_file":
-                out = read_file(args["filepath"], args["start_line"], args["end_line"])
-            elif name == "edit_file":
-                out = edit_file(args["filepath"], args["old_str"], args["new_str"])
-            elif name == "list_files":
-                out = list_files(args.get("directory", "."), args.get("pattern", "*"))
-            elif name == "search_code":
-                out = search_code(args["pattern"], args.get("file_pattern", "*"))
-            elif name == "search_function_or_class_definition_in_code":
-                out = search_function_or_class_definition_in_code(args["name"])
-            elif name == "find_references":
-                out = find_references(args["name"], args["filepath"], args.get("line", -1))
-            elif name == "run_tests":
-                out = run_tests()
-            elif name == "get_patch":
-                out = get_patch()
-            elif name == "run_command":
-                out = run_command(args["command"], args.get("workdir", ""))
-            else:
-                send_response({"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": "Not found"}})
-                return
-            send_response({"jsonrpc": "2.0", "id": req_id, "result": {"content": [{"type": "text", "text": str(out)}]}})
-        except Exception as e:
-            send_response({"jsonrpc": "2.0", "id": req_id, "error": {"code": -32603, "message": str(e)}})
-        return
-
-
-def main():
-    for line in sys.stdin:
-        if line.strip():
-            handle_request(line.strip())
-
-
 if __name__ == "__main__":
-    main()
+    try:
+        import argparse
+
+        parser = argparse.ArgumentParser(description="SWE-bench MCP Server")
+        parser.add_argument(
+            "--container-id",
+            type=str,
+            default="",
+            help="Docker container ID (overrides SWE_CONTAINER_ID)",
+        )
+        parser.add_argument(
+            "--transport",
+            default="stdio",
+            choices=["stdio", "sse", "streamable-http"],
+            help="MCP transport protocol",
+        )
+        parser.add_argument(
+            "--port",
+            type=int,
+            default=8000,
+            help="Port for HTTP/SSE transport",
+        )
+        args, _ = parser.parse_known_args()
+
+        if args.container_id:
+            CONTAINER_ID = args.container_id
+
+        if args.transport in ("sse", "streamable-http"):
+            getattr(mcp, "run")(transport=args.transport, port=args.port)
+        else:
+            mcp.run(transport="stdio")
+    except Exception as err:
+        print(f"SWE MCP server error: {err}", file=sys.stderr)
+        sys.exit(1)

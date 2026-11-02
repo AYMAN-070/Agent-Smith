@@ -1,9 +1,43 @@
 """MCP client implementations over stdio and HTTP."""
 
 import json
+import os
 import shlex
+import shutil
 import subprocess
+import sys
 from typing import Any, cast
+
+
+def _parse_command(command: str) -> list[str]:
+    """Parse command line string into argument list, handling unquoted paths with spaces."""
+    raw_args = shlex.split(command)
+    if not raw_args:
+        return []
+
+    if raw_args[0] == "python" and not shutil.which("python"):
+        raw_args[0] = sys.executable
+
+    args: list[str] = []
+    i = 0
+    while i < len(raw_args):
+        if not os.path.exists(raw_args[i]) and not raw_args[i].startswith("-"):
+            found = False
+            for j in range(len(raw_args), i, -1):
+                joined = " ".join(raw_args[i:j])
+                if os.path.exists(joined):
+                    args.append(joined)
+                    i = j
+                    found = True
+                    break
+            if not found:
+                args.append(raw_args[i])
+                i += 1
+        else:
+            args.append(raw_args[i])
+            i += 1
+
+    return args
 
 
 class MCPClient:
@@ -20,7 +54,7 @@ class MCPClient:
 
     def start(self) -> None:
         """Start the MCP server subprocess."""
-        args = shlex.split(self.command)
+        args = _parse_command(self.command)
         self.process = subprocess.Popen(
             args,
             stdin=subprocess.PIPE,
@@ -188,6 +222,7 @@ class HttpMCPClient:
         self, method: str, params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Send a JSON-RPC 2.0 POST request over HTTP."""
+        import json
         import requests
 
         req_id = self._next_id()
@@ -199,7 +234,7 @@ class HttpMCPClient:
         }
         headers = {
             "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream, */*"
+            "Accept": "application/json, text/event-stream",
         }
         if self.session_id:
             headers["mcp-session-id"] = self.session_id
@@ -211,17 +246,23 @@ class HttpMCPClient:
             if "mcp-session-id" in resp.headers:
                 self.session_id = resp.headers["mcp-session-id"]
             resp.raise_for_status()
+
+            # Update session ID if provided by server
+            resp_session_id = resp.headers.get("mcp-session-id")
+            if resp_session_id:
+                self.session_id = resp_session_id
+
             try:
                 data = resp.json()
             except Exception:
-                # Support SSE / streamable-http format (data: {...})
+                # Fallback for Server-Sent Events (SSE) format
                 data = None
                 for line in resp.text.splitlines():
                     if line.startswith("data:"):
                         data = json.loads(line[5:].strip())
                         break
                 if data is None:
-                    raise
+                    raise RuntimeError(f"Could not parse MCP HTTP response: {resp.text}")
         except Exception as e:
             raise RuntimeError(f"MCP HTTP request failed: {e}") from e
         if "error" in data:
