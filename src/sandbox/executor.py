@@ -76,7 +76,23 @@ SAFE_BUILTINS: dict[str, Any] = {
     "NotImplementedError": NotImplementedError,
     "StopIteration": StopIteration,
     "AssertionError": AssertionError,
+    "MemoryError": MemoryError,
+    "ZeroDivisionError": ZeroDivisionError,
+    "OverflowError": OverflowError,
+    "TimeoutError": TimeoutError,
+    "NameError": NameError,
+    "LookupError": LookupError,
+    "ArithmeticError": ArithmeticError,
+    "OSError": OSError,
+    "dir": dir,
     "bytearray": bytearray,
+    "repr": repr,
+    "chr": chr,
+    "ord": ord,
+    "getattr": getattr,
+    "hasattr": hasattr,
+    "setattr": setattr,
+    "delattr": delattr,
 }
 
 
@@ -176,50 +192,55 @@ def create_safe_environment(
 
 
 def apply_network_block() -> None:
-    """Disable external network access in worker, allowing loopback for local MCP."""
+    """Disable all outbound network access except loopback (needed for local MCP servers)."""
     import socket
 
-    orig_getaddrinfo = socket.getaddrinfo
+    LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+    real_create_conn = socket.create_connection
+    real_gai = socket.getaddrinfo
 
-    def safe_getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
-        host_str = str(host).lower()
-        if host_str in ("localhost", "127.0.0.1", "::1"):
-            return orig_getaddrinfo(host, *args, **kwargs)
-        raise PermissionError(
-            f"Sandbox security: network access to '{host}' is forbidden."
-        )
+    class GuardedSocket(socket.socket):
+        """Socket wrapper allowing only connections to local loopback."""
 
-    orig_create_connection = socket.create_connection
+        def connect(self, address: Any) -> Any:
+            host = address[0] if isinstance(address, tuple) and len(address) > 0 else address
+            if host not in LOOPBACK_HOSTS:
+                raise PermissionError("Sandbox security: network access is forbidden.")
+            return super().connect(address)
 
-    def safe_create_connection(address: Any, *args: Any, **kwargs: Any) -> Any:
-        host = (
-            str(address[0]).lower()
-            if isinstance(address, (tuple, list)) and address
-            else ""
-        )
-        if host in ("localhost", "127.0.0.1", "::1"):
-            return orig_create_connection(address, *args, **kwargs)
-        raise PermissionError(
-            f"Sandbox security: network connection to '{host}' is forbidden."
-        )
+        def connect_ex(self, address: Any) -> Any:
+            host = address[0] if isinstance(address, tuple) and len(address) > 0 else address
+            if host not in LOOPBACK_HOSTS:
+                raise PermissionError("Sandbox security: network access is forbidden.")
+            return super().connect_ex(address)
 
-    orig_socket_connect = socket.socket.connect
+    def guarded_create_connection(address: Any, *args: Any, **kwargs: Any) -> Any:
+        host = address[0] if isinstance(address, tuple) and len(address) > 0 else address
+        if host not in LOOPBACK_HOSTS:
+            raise PermissionError("Sandbox security: network access is forbidden.")
+        return real_create_conn(address, *args, **kwargs)
 
-    def safe_connect(self: Any, address: Any) -> Any:
-        host = (
-            str(address[0]).lower()
-            if isinstance(address, (tuple, list)) and address
-            else ""
-        )
-        if host in ("localhost", "127.0.0.1", "::1"):
-            return orig_socket_connect(self, address)
-        raise PermissionError(
-            f"Sandbox security: network connection to '{host}' is forbidden."
-        )
+    def guarded_getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if host not in LOOPBACK_HOSTS:
+            raise PermissionError("Sandbox security: network access is forbidden.")
+        return real_gai(host, *args, **kwargs)
 
-    socket.getaddrinfo = safe_getaddrinfo  # type: ignore[assignment]
-    socket.create_connection = safe_create_connection  # type: ignore[assignment]
-    socket.socket.connect = safe_connect  # type: ignore[assignment]
+    def blocked_func(*args: Any, **kwargs: Any) -> Any:
+        """Raise PermissionError on blocked network operations."""
+        raise PermissionError("Sandbox security: network access is forbidden.")
+
+    socket.socket = GuardedSocket  # type: ignore[misc]
+    socket.create_connection = guarded_create_connection
+    socket.getaddrinfo = guarded_getaddrinfo
+
+    for attr in (
+        "gethostbyname",
+        "gethostbyname_ex",
+        "getnameinfo",
+        "socketpair",
+        "fromfd",
+    ):
+        setattr(socket, attr, blocked_func)
 
 
 def apply_system_limits(config: SandboxConfig) -> None:

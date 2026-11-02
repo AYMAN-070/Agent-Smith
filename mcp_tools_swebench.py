@@ -7,6 +7,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    from mcp.server.fastmcp import FastMCP
+except ImportError:
+    try:
+        from fastmcp import FastMCP  # type: ignore[no-redef,import-not-found]
+    except Exception as err:
+        print(f"Error importing FastMCP: {err}", file=sys.stderr)
+        sys.exit(1)
+
+try:
+    mcp = FastMCP("SWE MCP Server")
+except Exception as err:
+    print(f"Error initializing FastMCP: {err}", file=sys.stderr)
+    sys.exit(1)
+
 # Docker container ID for SWE-bench (if running against a container)
 CONTAINER_ID = os.environ.get("SWE_CONTAINER_ID") or os.environ.get(
     "DOCKER_CONTAINER_ID"
@@ -19,17 +34,16 @@ TESTBED_PATH = os.environ.get(
 
 
 def _resolve_testbed_path(p: str | Path) -> Path:
-    """Resolve a file or directory path against TESTBED_PATH."""
+    """Resolve path relative to TESTBED_PATH, mapping /testbed to TESTBED_PATH."""
+    p_str = str(p)
+    if p_str == "/testbed":
+        return Path(TESTBED_PATH).resolve()
+    if p_str.startswith("/testbed/"):
+        return (Path(TESTBED_PATH) / p_str[len("/testbed/"):]).resolve()
     path = Path(p)
-    if str(path).startswith("/testbed") and not Path("/testbed").exists():
-        try:
-            rel = path.relative_to("/testbed")
-            return Path(TESTBED_PATH) / rel
-        except ValueError:
-            pass
     if not path.is_absolute():
-        return Path(TESTBED_PATH) / path
-    return path
+        return (Path(TESTBED_PATH) / path).resolve()
+    return path.resolve()
 
 
 def _docker_exec(
@@ -362,7 +376,7 @@ def search_function_or_class_definition_in_code(name: str) -> str:
       - name: Exact function or class name to locate.
     """
     pattern = rf"^\s*(?:async\s+def|def|class)\s+{re.escape(name)}\b"
-    return search_code(pattern=pattern, file_pattern="*.py")
+    return str(search_code(pattern=pattern, file_pattern="*.py"))
 
 
 def find_references(name: str, filepath: str, line: int) -> str:
@@ -611,7 +625,10 @@ def run_command(command: str, workdir: str = "") -> str:
         except Exception as e:
             return f"Error running command in container: {e}"
 
-    cwd = _resolve_testbed_path(workdir) if workdir else Path(TESTBED_PATH)
+    if not workdir:
+        cwd = Path(TESTBED_PATH).resolve()
+    else:
+        cwd = _resolve_testbed_path(workdir)
 
     if not cwd.exists() or not cwd.is_dir():
         return (
@@ -726,11 +743,10 @@ def handle_request(line: str) -> None:
         return
 
 
-def main():
-    for line in sys.stdin:
-        if line.strip():
-            handle_request(line.strip())
-
-
-if __name__ == "__main__":
-    main()
+        if args.transport in ("sse", "streamable-http"):
+            getattr(mcp, "run")(transport=args.transport, port=args.port)
+        else:
+            mcp.run(transport="stdio")
+    except Exception as err:
+        print(f"SWE MCP server error: {err}", file=sys.stderr)
+        sys.exit(1)
