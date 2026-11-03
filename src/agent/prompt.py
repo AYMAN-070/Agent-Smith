@@ -192,7 +192,7 @@ class SWEPromptBuilder:
             "1. All tools are callable directly as global Python functions (no import required).\n"
             "2. DO NOT use `import` (e.g. `import os`, `import sys`, or library imports) and DO NOT use `open()`.\n"
             "   Sandbox security forbids them. Interact with the repo ONLY via provided tools (`read_file`, `edit_file`, `list_files`).\n"
-            "3. PRECISE CODE SEARCH (CRITICAL):\n"
+            "3. EXACT CODE SEARCH (CRITICAL):\n"
             "   - When using `search_code`, ALWAYS specify a specific query and a target file or subdirectory path (e.g. `search_code('class Pipeline', 'sklearn/pipeline.py')` or `search_code('def __len__', 'sklearn/compose')`).\n"
             "   - NEVER search generic short patterns (like '__len__' or 'def ') across the entire repository without a file path. It produces overwhelming output.\n"
             "4. Every script MUST produce observable output by using `print()` for tool results.\n"
