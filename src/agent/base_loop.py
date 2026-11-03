@@ -39,6 +39,8 @@ class BaseAgentLoop:
         self.output_path = output_path
         self.llm_request = LlmRequest(model_name, provider_url)
         self.prompt: Any = None
+        self.last_code: str | None = None
+        self.repeat_count: int = 0
 
     @property
     def task_id(self) -> str:
@@ -86,6 +88,41 @@ class BaseAgentLoop:
         }
         return self.record_step(llm, sand_answer, step)
 
+    def reset_repetition_tracker(self) -> None:
+        """Reset repetition tracker when no code is generated."""
+        self.last_code = None
+        self.repeat_count = 0
+
+    def check_repetitive_code(self, code: str, step: int) -> str | None:
+        """Detect duplicate executed code and return a warning if repeated."""
+        normalized_code = "\n".join(
+            line.strip()
+            for line in code.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        )
+        if self.last_code and normalized_code == self.last_code:
+            self.repeat_count += 1
+            action_hint = (
+                "Revise your function logic or submit with "
+                "`final_answer(...)`."
+                if self.benchmark == "mbpp"
+                else "Move forward immediately: apply your fix using "
+                "`edit_file` or run tests with `print(run_tests())`."
+            )
+            return (
+                f"[WARNING: REPETITIVE COMMAND DETECTED "
+                f"(attempt {self.repeat_count + 1})]\n"
+                f"You executed the EXACT same code as in step {step - 1}!\n"
+                "You already received this observation above. "
+                "Do NOT repeat the same queries or re-read the same "
+                "file lines.\n"
+                f"{action_hint}\n\n"
+            )
+
+        self.repeat_count = 0
+        self.last_code = normalized_code
+        return None
+
     def handle_no_code(
         self,
         llm_response: LlmResponse,
@@ -96,6 +133,7 @@ class BaseAgentLoop:
         print(
             "⚠️  [Warning]: No code block detected. Prompting LLM to format correctly."
         )
+        self.reset_repetition_tracker()
         feedback = SandboxOutputHandler.get_no_code_feedback(self.benchmark)
         self.prompt.add_model_response(llm_response.llm_output)
         self.prompt.add_feedback(feedback, step=step, max_steps=max_loop)
@@ -208,6 +246,14 @@ class BaseAgentLoop:
             error="Process interrupted or timed out before completion.",
         )
 
+    def try_auto_submit(
+        self,
+        steps_metric: list[StepMetrics],
+        start_time: float,
+    ) -> str | None:
+        """Attempt to auto-submit solution if conditions are met. Default no-op."""
+        return None
+
     def _save_failure(
         self,
         steps: list[StepMetrics],
@@ -215,6 +261,10 @@ class BaseAgentLoop:
         error: str | None = None,
     ) -> str:
         """Build and save failure output to output_path and return failure status."""
+        auto_solution = self.try_auto_submit(steps, start_time)
+        if auto_solution is not None:
+            return auto_solution
+
         self._save_solution(
             status=False,
             solution=self.failure_solution_value,

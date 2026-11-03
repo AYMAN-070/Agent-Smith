@@ -38,7 +38,7 @@ def _resolve_testbed_path(p: str | Path) -> Path:
     if p_str == "/testbed":
         return Path(TESTBED_PATH).resolve()
     if p_str.startswith("/testbed/"):
-        return (Path(TESTBED_PATH) / p_str[len("/testbed/") :]).resolve()
+        return (Path(TESTBED_PATH) / p_str[len("/testbed/"):]).resolve()
     path = Path(p)
     if not path.is_absolute():
         return (Path(TESTBED_PATH) / path).resolve()
