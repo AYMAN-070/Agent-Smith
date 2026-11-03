@@ -1,5 +1,6 @@
 """Base class for agent execution loops."""
 
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,7 @@ class BaseAgentLoop:
         self.prompt: Any = None
         self.last_code: str | None = None
         self.repeat_count: int = 0
+        self.read_history: list[tuple[str, int]] = []
 
     @property
     def task_id(self) -> str:
@@ -92,6 +94,7 @@ class BaseAgentLoop:
         """Reset repetition tracker when no code is generated."""
         self.last_code = None
         self.repeat_count = 0
+        self.read_history.clear()
 
     def check_repetitive_code(self, code: str, step: int) -> str | None:
         """Detect duplicate executed code and return a warning if repeated."""
@@ -121,6 +124,33 @@ class BaseAgentLoop:
 
         self.repeat_count = 0
         self.last_code = normalized_code
+
+        # Check for repeated reads in the same ~20-line range
+        read_match = re.search(
+            r"read_file\(\s*['\"]([^'\"]+)['\"]\s*,\s*(\d+)", code
+        )
+        if read_match:
+            filepath = read_match.group(1)
+            start_line = int(read_match.group(2))
+            recent_reads = sum(
+                1
+                for f, s in self.read_history
+                if f == filepath and abs(s - start_line) <= 20
+            )
+            self.read_history.append((filepath, start_line))
+            if recent_reads >= 2:
+                return (
+                    f"[WARNING: REPETITIVE FILE INSPECTION DETECTED]\n"
+                    f"You have already read lines near {start_line} of "
+                    f"'{filepath}' {recent_reads + 1} times!\n"
+                    "The code is already in your observation history above. "
+                    "Do NOT read it again.\n"
+                    "Apply your fix NOW using `edit_file`.\n\n"
+                )
+
+        if "edit_file" in code:
+            self.read_history.clear()
+
         return None
 
     def handle_no_code(
