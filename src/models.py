@@ -37,7 +37,7 @@ class SandboxConfig(BaseModel):
         default_factory=lambda: ["/testbed", "/tmp/agent"]
     )
 
-    max_execution_time_seconds: int = 30
+    max_execution_time_seconds: int = 90
     max_memory_mb: int = 512
 
 
