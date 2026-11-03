@@ -65,8 +65,8 @@ class SandboxOutputHandler:
         output: str,
         head_lines: int = 40,
         tail_lines: int = 60,
-        max_line_chars: int = 1500,
-        max_total_chars: int = 15000,
+        max_line_chars: int = 1000,
+        max_total_chars: int = 5000,
     ) -> str:
         """Remove conda bash debug noise and truncate long observations.
 
