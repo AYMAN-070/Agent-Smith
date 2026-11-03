@@ -149,8 +149,7 @@ class SandboxOutputHandler:
             f"{observation}\n\n"
             "[CRITICAL NOTICE: ALL TESTS PASSED SUCCESSFULLY!]\n"
             "Your fix is verified. Do NOT modify tests or refactor further.\n"
-            "Inspect your diff with print(get_patch()) then submit immediately "
-            "using: final_answer(get_patch())"
+            "Submit your verified patch NOW using: final_answer(get_patch())"
         )
 
     @staticmethod
