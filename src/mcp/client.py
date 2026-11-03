@@ -223,6 +223,7 @@ class HttpMCPClient:
     ) -> dict[str, Any]:
         """Send a JSON-RPC 2.0 POST request over HTTP."""
         import json
+
         import requests
 
         req_id = self._next_id()
@@ -262,7 +263,9 @@ class HttpMCPClient:
                         data = json.loads(line[5:].strip())
                         break
                 if data is None:
-                    raise RuntimeError(f"Could not parse MCP HTTP response: {resp.text}")
+                    raise RuntimeError(
+                        f"Could not parse MCP HTTP response: {resp.text}"
+                    )
         except Exception as e:
             raise RuntimeError(f"MCP HTTP request failed: {e}") from e
         if "error" in data:
