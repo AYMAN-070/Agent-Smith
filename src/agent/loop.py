@@ -133,6 +133,10 @@ class MBPPAgentLoop(BaseAgentLoop):
                 feedback = SandboxOutputHandler.get_mbpp_feedback(
                     code_for_sandbox, sand_answer
                 )
+                rep_warn = self.check_repetitive_code(code_for_sandbox, step)
+                if rep_warn:
+                    feedback = rep_warn + feedback
+
                 if llm_response.is_malformed:
                     malformed_warn = (
                         f"[WARNING: Code block was malformed: "
@@ -198,6 +202,7 @@ class SWEAgentLoop(BaseAgentLoop):
             self.bug_description, tools_manual=sandbox.tools
         )
         self.docker_container = docker_container
+        self.tests_passed: bool = False
 
     def handle_shutdown(
         self,
@@ -214,13 +219,42 @@ class SWEAgentLoop(BaseAgentLoop):
             except Exception as e:
                 print(f"Error removing container during shutdown: {e}")
 
+    def try_auto_submit(
+        self,
+        steps_metric: list[StepMetrics],
+        start_time: float,
+    ) -> str | None:
+        """Auto-submit patch if repository tests have passed and diff is valid."""
+        if not self.tests_passed:
+            return None
+        patch_res = self.sandbox.execute("print(get_patch())")
+        if patch_res.get("status") == "success" and patch_res.get("output"):
+            candidate_patch = patch_res["output"].strip()
+            patch_markers = ["diff --git", "--- a/", "+++ b/", "@@"]
+            if any(m in candidate_patch for m in patch_markers):
+                print("\n" + "=" * 50)
+                print(
+                    "🎯 AUTO-SUBMIT: Tests passed and valid patch verified! "
+                    "Submitting solution."
+                )
+                print(f"Final Solution:\n{candidate_patch}")
+                print("=" * 50 + "\n")
+                self._save_solution(
+                    status=True,
+                    solution=candidate_patch,
+                    steps=steps_metric,
+                    total_time_seconds=time.time() - start_time,
+                )
+                return candidate_patch
+        return None
+
     def run(self) -> str:
         """Execute the iterative loop to resolve the SWE-bench bug."""
         start_time = time.time()
         steps_metric: list[StepMetrics] = []
         max_loop = self.rules.iterations
         current_loop = 0
-        tests_passed = False
+        self.tests_passed = False
         print("\n" + "=" * 50)
         print("🛠️ START SWE AGENT LOOP")
         print("=" * 50)
@@ -314,18 +348,26 @@ class SWEAgentLoop(BaseAgentLoop):
 
                 # 2. Process feedback and update prompt
                 if "edit_file" in code_for_sandbox:
-                    tests_passed = False
+                    self.tests_passed = False
 
                 has_patch = False
                 if "run_tests" in code_for_sandbox:
                     patch_res = self.sandbox.execute("print(get_patch())")
                     has_patch = bool(patch_res.get("output", "").strip())
 
-                feedback, tests_passed = (
+                feedback, self.tests_passed = (
                     SandboxOutputHandler.get_swebench_feedback(
-                        code_for_sandbox, sand_answer, tests_passed, has_patch
+                        code_for_sandbox,
+                        sand_answer,
+                        self.tests_passed,
+                        has_patch,
                     )
                 )
+
+                rep_warn = self.check_repetitive_code(code_for_sandbox, step)
+                if rep_warn:
+                    feedback = rep_warn + feedback
+
                 if llm_response.is_malformed:
                     malformed_warn = (
                         f"[WARNING: Code block was malformed: "
