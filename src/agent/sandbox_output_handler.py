@@ -61,7 +61,12 @@ class SandboxOutputHandler:
 
     @staticmethod
     def clean_and_truncate(
-        code: str, output: str, head_lines: int = 40, tail_lines: int = 60
+        code: str,
+        output: str,
+        head_lines: int = 40,
+        tail_lines: int = 60,
+        max_line_chars: int = 1000,
+        max_total_chars: int = 5000,
     ) -> str:
         """Remove conda bash debug noise and truncate long observations.
 
@@ -75,6 +80,10 @@ class SandboxOutputHandler:
             Number of initial lines to preserve.
         tail_lines : int
             Number of trailing lines to preserve.
+        max_line_chars : int
+            Maximum length of an individual line before truncating it.
+        max_total_chars : int
+            Absolute ceiling for total observation characters.
 
         Returns
         -------
@@ -83,28 +92,55 @@ class SandboxOutputHandler:
         """
         lines = output.splitlines()
 
-        # Only strip bash debug traces if run_tests or bash commands ran.
+        # Only strip bash debug traces and conda environment noise
         # NEVER strip lines starting with '+' on get_patch/diff outputs!
         if "run_tests" in code or "run_command" in code:
+            noisy_prefixes = (
+                "+",
+                "export CONDA",
+                "export _CE",
+                "export PATH=",
+                "__conda",
+            )
             lines = [
                 line
                 for line in lines
-                if not line.startswith(("+ ", "++ ", "+++ "))
+                if not any(line.strip().startswith(p) for p in noisy_prefixes)
             ]
+
+        # Truncate overly long individual lines to protect against binary dumps
+        sanitized_lines: list[str] = []
+        for line in lines:
+            if len(line) > max_line_chars:
+                sanitized_lines.append(
+                    line[:max_line_chars] + "... [line truncated]"
+                )
+            else:
+                sanitized_lines.append(line)
+        lines = sanitized_lines
 
         max_lines = head_lines + tail_lines
         if len(lines) <= max_lines:
-            return "\n".join(lines)
+            assembled = "\n".join(lines)
+        else:
+            head = lines[:head_lines]
+            tail = lines[-tail_lines:]
+            omitted = len(lines) - max_lines
 
-        head = lines[:head_lines]
-        tail = lines[-tail_lines:]
-        omitted = len(lines) - max_lines
+            truncation_marker = (
+                f"\n\n... [OUTPUT TRUNCATED: {omitted} lines omitted "
+                "to save context] ...\n\n"
+            )
+            assembled = "\n".join(head) + truncation_marker + "\n".join(tail)
 
-        truncation_marker = (
-            f"\n\n... [OUTPUT TRUNCATED: {omitted} lines omitted "
-            "to save context] ...\n\n"
-        )
-        return "\n".join(head) + truncation_marker + "\n".join(tail)
+        # Hard ceiling on total character count
+        if len(assembled) > max_total_chars:
+            hard_marker = (
+                "\n\n... [OUTPUT HARD TRUNCATED TO PREVENT TOKEN OVERFLOW] ..."
+            )
+            assembled = assembled[:max_total_chars] + hard_marker
+
+        return assembled
 
     @staticmethod
     def build_test_success_feedback(observation: str) -> str:
@@ -164,7 +200,7 @@ class SandboxOutputHandler:
                 )
 
             if cls.is_test_run_finished(
-                code, observation, has_patch=True, benchmark="mbpp"
+                code, raw_obs, has_patch=True, benchmark="mbpp"
             ):
                 print(
                     "🎯 MBPP tests passed! Forcing agent to submit final_answer."
@@ -217,7 +253,7 @@ class SandboxOutputHandler:
             print(observation if observation else "(No stdout output)")
 
             if cls.is_test_run_finished(
-                code, observation, has_patch=has_patch, benchmark="swebench"
+                code, raw_obs, has_patch=has_patch, benchmark="swebench"
             ):
                 print("🎯 Tests passed! Forcing agent to inspect and submit.")
                 return cls.build_test_success_feedback(observation), True
@@ -232,6 +268,17 @@ class SandboxOutputHandler:
                     cls.build_patch_confirmed_feedback(observation),
                     tests_passed,
                 )
+
+            if tests_passed:
+                print("⚠️ Tests already passed! Forcing agent to submit.")
+                force_msg = (
+                    f"{observation}\n\n"
+                    "[URGENT: ALL TESTS ARE ALREADY VERIFIED AND PASSED!]\n"
+                    "Do NOT run tests or make further edits.\n"
+                    "Submit your verified patch immediately using: "
+                    "final_answer(get_patch())"
+                )
+                return force_msg, tests_passed
 
             if not observation:
                 return (
