@@ -33,9 +33,7 @@ class PromptBuilder:
         formatted: list[str] = []
         for test in test_list:
             if len(test) > max_chars:
-                truncated = (
-                    f"{test[:200]} ... [truncated {len(test) - 250} chars] ... {test[-50:]}"
-                )
+                truncated = f"{test[:200]} ... [truncated {len(test) - 250} chars] ... {test[-50:]}"
                 formatted.append(truncated)
             else:
                 formatted.append(test)
@@ -44,49 +42,31 @@ class PromptBuilder:
     def build_initial_payload(self) -> None:
         """Construct initial system and user messages payload."""
         formatted_tests = self.format_tests_for_prompt(self.test_list)
-        manual_section = self.tools_manual or (
-            "AVAILABLE TOOLS:\n"
-            "1. run_tests(code: str, test_list: list[str]) -> str:\n"
-            "   Runs candidate code against test assertions and returns a JSON string ('success': bool, 'output': str).\n"
-            "2. final_answer(solution_code: str):\n"
-            "   Call this built-in function to submit your final solution."
-        )
-
         self.system_instruction = (
-            "You are an autonomous Code Agent solving Python tasks in a sandbox.\n"
-            "Output ONLY executable Python code enclosed in ```python ... ``` without any markdown or prose outside the block.\n"
-            "CRITICAL: ABSOLUTELY ZERO COMMENTS. Do NOT write '#' comments, docstrings, or reasoning traces. Output ONLY raw executable Python code.\n\n"
-            f"{manual_section}\n\n"
-            "CRITICAL RULES:\n"
-            "1. Output Observable Results: Every step must produce observable stdout.\n"
-            "2. Two-Phase Discipline (Strict):\n"
-            "   - Step 1 (Test): Test candidate code using `print(run_tests(candidate_code, test_list))` and STOP. Wait for sandbox output.\n"
-            "     Note: The variable test_list is already pre-loaded into the execution namespace. Do NOT re-declare it in your code. Pass it directly: run_tests(your_code, test_list).\n"
-            "     Note: `run_tests` returns a JSON string (not a dict); do not index it (`res['success']`).\n"
-            "   - Step 2 (Submit): In a separate step, once tests pass, submit via `final_answer(solution_code)` (pass code as string, e.g. `final_answer(candidate)`).\n"
-            "   - NEVER call `final_answer` and `run_tests` in the same step.\n"
-            "3. Test Integrity (Strict - No Cheating):\n"
-            "   - NEVER modify, tamper with, or mock the test assertions or inputs (e.g. altering expected values or changing assertions to force a pass).\n"
-            "   - The candidate code must genuinely pass the original tests.\n"
-            "4. Implementation & Generalization:\n"
-            "   - Favor standard Python string/list manipulation (split, slices) over complex regular expressions when formatting simple data.\n"
-            "   - Implement complete logic handling edge cases and default returns (None, 0, False, empty values). Hidden tests are evaluated; do not overfit.\n"
-            "   - For tie-breaking (equal counts/values), preserve original input order.\n"
-            "   - Subarray vs Subsequence: If a 'subsequence' task fails assertions, check whether the problem expects contiguous increasing subarrays/slices (consecutive elements) rather than arbitrary subsequences.\n"
-            "   - Subsequence from prefix till index i: An increasing subsequence formed from elements within prefix a[0...i] that can be extended by element a[k] (k > i). It does NOT require a[k] > a[index] and does NOT require that a[index] itself is in the subsequence; do NOT check `if a[k] <= a[index]: return 0`.\n"
-            "   - Bidirectional tuple pairs: MBPP dataset contains a known author flaw in count_bidirectional: the condition MUST literally be written `if test_list[j][0] == test_list[i][1] and test_list[i][1] == test_list[j][0]:` (do NOT 'fix' it to check test_list[i][0]).\n"
-            "   - Combinations/Subsets Ordering: When asked for combinations/subsets of a list, MBPP builds power sets by starting with [[]] and for each element x prepending x: `res += [[x] + sub for sub in res]` (note: `[x] + sub`, NOT `sub + [x]`, and NOT itertools.combinations).\n"
-            "5. Sandbox Security: NEVER access introspection or dunder attributes like `__code__`, `__globals__`, or `__class__`. Pass candidate code as a plain multi-line string literal to `run_tests(candidate_code, test_list)`.\n"
-            "6. Absolute Zero-Comment Policy: NEVER write comments (`#`) or explanations. Any comment wastes token budget and is strictly forbidden. Output ONLY pure executable code."
+            "You are an autonomous Python code agent in a sandbox.\n"
+            "Output ONLY executable Python code inside ```python ... ``` with ABSOLUTELY ZERO '#' comments or text outside.\n\n"
+            "WORKFLOW (Two Phases):\n"
+            "1. Test Phase: Define solution as a multi-line string and run tests:\n"
+            '   candidate = """\n'
+            "def function_name(...):\n"
+            "    ...\n"
+            '"""\n'
+            "   print(run_tests(candidate, test_list))\n"
+            "   - `test_list` is pre-loaded in globals. Pass it directly, do NOT re-declare it.\n"
+            "   - `candidate` must be a multi-line string literal (not a function, no __code__).\n\n"
+            "2. Submit Phase: Once all tests pass in stdout, submit:\n"
+            "   final_answer(candidate)\n\n"
+            "RULES:\n"
+            "- Never call run_tests and final_answer in the same step.\n"
+            "- Favor standard Python, handle edge cases (empty, None, 0, order preservation).\n"
+            "- Do NOT tamper with test assertions."
         )
 
         user_content = (
             f"TASK: {self.task_definition}\n\n"
             f"REQUIRED FUNCTION SIGNATURE:\n{self.function}\n\n"
-            f"TEST CASES (reference):\n{formatted_tests}\n\n"
-            "The variable test_list is already pre-loaded into the execution namespace. "
-            "Do NOT re-declare it in your code. Pass it directly: run_tests(your_code, test_list).\n\n"
-            "Start by testing your candidate implementation. Output strictly executable code with NO '#' comments."
+            f"TEST CASES (reference only, pre-loaded in test_list):\n{formatted_tests}\n\n"
+            "Start by testing candidate code. Do NOT re-declare test_list. Output code only with ZERO comments."
         )
 
         self.payload: dict[str, Any] = {
@@ -100,7 +80,7 @@ class PromptBuilder:
                     "content": user_content,
                 },
             ],
-            "temperature": 0.0,
+            "temperature": 0.1,
             "max_tokens": 1000,
             "top_p": 0.95,
         }
@@ -131,7 +111,7 @@ class PromptBuilder:
             type_error_hint += (
                 "\nCRITICAL NOTE: Sandbox security forbids dunder/introspection "
                 "attributes (e.g. `__code__`). Define candidate code as a string "
-                "literal: `candidate = \"\"\"def func(...): ...\"\"\"`.\n"
+                'literal: `candidate = """def func(...): ..."""`.\n'
             )
 
         step_header = (
@@ -260,8 +240,8 @@ class SWEPromptBuilder:
                 {"role": "system", "content": self.system_instruction},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.0,
-            "max_tokens": 800,
+            "temperature": 0.1,
+            "max_tokens": 1000,
             "top_p": 0.95,
         }
 
