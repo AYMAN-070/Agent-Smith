@@ -60,7 +60,7 @@ GROQ_API_KEY=gsk_...
 #### 1. Code Quality & Linting
 Validate strict typing and styling across all files (zero warnings allowed):
 ```bash
-make lint
+make lint-strict
 ```
 
 #### 2. Running MBPP Agent
@@ -119,15 +119,17 @@ The project is structured into clean, decoupled layers separating orchestration,
                                           └───────────────────────────────────┘
 ```
 
+> **Note**: The diagram above is a simplified high-level representation of the agent's runtime architecture. For an exhaustive graph illustrating every decision branch, refer to the full diagram: [Detailed Execution Flow Diagram](execution_flow.png).
+
 ### Directory Structure
 ```
 Agent-Smith/
 ├── agent_mbpp/              # CLI entry point for MBPP agent
 ├── agent_swebench/          # CLI entry point for SWE-bench agent
 ├── benchmarks/              # Benchmark suite, tasks, and run traces
-│   ├── run_benchmark.py     # Automated benchmark runner & report generator
-│   ├── runs/                # JSON solution traces for each model x task
-│   └── tasks/               # Standardized SWE-bench tasks (xarray, django, sympy)
+│   ├── assets/              # Performance, Pareto, and token accumulation SVG charts
+│   ├── runs/                # 40 backing JSON solution traces (model x task)
+│   └── tasks/               # Standardized SWE-bench tasks (xarray, django, sympy, etc.)
 ├── src/
 │   ├── agent/               # Agent control loop, prompt builders, output sanitizers
 │   │   ├── base_loop.py     # Base agent loop with metrics and limit enforcement
@@ -150,9 +152,12 @@ Agent-Smith/
 │       └── manual.py        # Auto-generated tools documentation for system prompt
 ├── mcp_tools_mbpp.py        # Standalone FastMCP server for MBPP
 ├── mcp_tools_swebench.py    # Standalone FastMCP server for SWE-bench
+├── sandbox_template.json    # JSON template for sandbox security limits and paths
+├── execution_flow.png       # Comprehensive decision graph and execution flow
 ├── BENCHMARK_REPORT.md      # Multi-model evaluation report
-├── Makefile                 # Build, lint, run, and benchmark targets
-└── pyproject.toml           # Project dependencies and tool settings
+├── Makefile                 # Build, lint-strict, sandbox, and agent execution targets
+├── pyproject.toml           # Project dependencies and tool settings
+└── uv.lock                  # Pinned dependency lockfile
 ```
 
 ---

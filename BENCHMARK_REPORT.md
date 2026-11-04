@@ -306,8 +306,7 @@ This line chart visualizes the cumulative token consumption over iteration steps
 
 ### Exact Reproducibility Specifications
 - **Harness Environment**: Linux x86_64, Python 3.10 / uv, Docker 24+ containerized sandbox.
-- **Hyperparameters**: `temperature = 0.0`, `max_tokens = 4096`, `top_p = 1.0`.
-- **Automated Verification Command**: `make benchmark-report` (or `python3 benchmarks/run_benchmark.py --report-only`).
+- **Hyperparameters**: `temperature = 0.0`, `max_tokens = 800`, `top_p = 0.95`.
 
 ---
 ### Backing Evaluation Files
