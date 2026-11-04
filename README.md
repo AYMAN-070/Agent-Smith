@@ -88,16 +88,6 @@ make sandbox-mbpp
 make sandbox-swe
 ```
 
-#### 5. Automated Benchmarking
-Run multi-model benchmarks and regenerate the Markdown evaluation report:
-```bash
-# Execute the full benchmark suite
-make benchmark
-
-# Re-generate BENCHMARK_REPORT.md from completed runs
-make benchmark-report
-```
-
 ---
 
 # System Architecture
@@ -313,10 +303,9 @@ In compliance with **Section V.7 (Model Benchmark Report)** of the 42 curriculum
 # Resources
 
 ### References
-- **ReAct: Synergizing Reasoning and Acting in Language Models** (Yao et al., 2022) — Foundation of the Thought-Action-Observation reasoning loop.
-- **SWE-bench: Can Language Models Resolve Real-World GitHub Issues?** (Jimenez et al., 2024) — Dataset, benchmark evaluation harness, and testbed container design.
-- **Model Context Protocol (MCP) Specification** — Standardized tool and resource discovery protocol over JSON-RPC 2.0.
-- **Python Security & Sandboxing** — Linux kernel `setrlimit` documentation, standard library `multiprocessing`, and socket restriction primitives.
+- [FastMCP](https://github.com/jlowin/fastmcp)
+- [SWE-bench](https://www.swebench.com)
+- [Python Sandbox](https://docs.python.org/3/library/resource.html)
 
 ### AI Usage & Pedagogical Collaboration (Gemini)
 
