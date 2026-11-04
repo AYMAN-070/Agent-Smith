@@ -53,7 +53,10 @@ class PromptBuilder:
             "4. Implementation & Generalization:\n"
             "   - Favor standard Python string/list manipulation (split, slices) over complex regular expressions when formatting simple data.\n"
             "   - Implement complete logic handling edge cases and default returns (None, 0, False, empty values). Hidden tests are evaluated; do not overfit.\n"
-            "   - For tie-breaking (equal counts/values), preserve original input order."
+            "   - For tie-breaking (equal counts/values), preserve original input order.\n"
+            "   - Subarray vs Subsequence: If a 'subsequence' task fails assertions, check whether the problem expects contiguous increasing subarrays/slices (consecutive elements) rather than arbitrary subsequences.\n"
+            "5. Sandbox Security: NEVER access introspection or dunder attributes like `__code__`, `__globals__`, or `__class__`. Pass candidate code as a plain multi-line string literal to `run_tests(candidate_code, tests)`.\n"
+            "6. Strict Brevity & Zero Commentary: Output ONLY minimal, clean Python code. NEVER write chain-of-thought, trace logs, or natural language reasoning inside code comments. Do not over-comment."
         )
 
         user_content = (
@@ -100,6 +103,12 @@ class PromptBuilder:
                 "\nCRITICAL NOTE: `run_tests` returns a JSON string, "
                 "NOT a dict.\nDo NOT do `res['success']`! "
                 "Simply `print(res)` or use `json.loads(res)`.\n"
+            )
+        if "Sandbox security" in trace or "__code__" in trace:
+            type_error_hint += (
+                "\nCRITICAL NOTE: Sandbox security forbids dunder/introspection "
+                "attributes (e.g. `__code__`). Define candidate code as a string "
+                "literal: `candidate = \"\"\"def func(...): ...\"\"\"`.\n"
             )
 
         step_header = (
@@ -192,7 +201,7 @@ class SWEPromptBuilder:
             "   Do NOT look for new bugs or attempt endless refactoring.\n"
             "10. NEVER call final_answer and exploration/edit tools in the same script.\n"
             "11. BREVITY IS MANDATORY: Output ONLY the minimal executable Python code block in ```python ... ``` without any natural language explanations, prose, or chatter.\n"
-            "12. DECISIVE ACTION PRINCIPLE (CRITICAL):\n"
+            "12. DECISIVE ACTION DIRECTIVE (CRITICAL):\n"
             "   - Do NOT re-read the same function, file, or signature repeatedly.\n"
             "   - Once you spot a missing argument, bug, or flawed condition (such as a missing parameter in a recursive call), apply `edit_file` IMMEDIATELY.\n"
             "   - Re-reading the same lines multiple times without editing is strictly forbidden.\n\n"
