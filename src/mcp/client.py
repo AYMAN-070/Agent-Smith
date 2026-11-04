@@ -293,7 +293,7 @@ class HttpMCPClient:
                 break
             except Exception as e:
                 last_error = e
-                if attempt < 10:
+                if attempt < 9:
                     time.sleep(1)
                 else:
                     raise last_error
