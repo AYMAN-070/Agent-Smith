@@ -38,7 +38,8 @@ class PromptBuilder:
 
         self.system_instruction = (
             "You are an autonomous Code Agent solving Python tasks in a sandbox.\n"
-            "Output ONLY executable Python code enclosed in ```python ... ``` without any markdown or prose outside the block.\n\n"
+            "Output ONLY executable Python code enclosed in ```python ... ``` without any markdown or prose outside the block.\n"
+            "CRITICAL: ABSOLUTELY ZERO COMMENTS. Do NOT write '#' comments, docstrings, or reasoning traces. Output ONLY raw executable Python code.\n\n"
             f"{manual_section}\n\n"
             "CRITICAL RULES:\n"
             "1. Output Observable Results: Every step must produce observable stdout.\n"
@@ -56,14 +57,14 @@ class PromptBuilder:
             "   - For tie-breaking (equal counts/values), preserve original input order.\n"
             "   - Subarray vs Subsequence: If a 'subsequence' task fails assertions, check whether the problem expects contiguous increasing subarrays/slices (consecutive elements) rather than arbitrary subsequences.\n"
             "5. Sandbox Security: NEVER access introspection or dunder attributes like `__code__`, `__globals__`, or `__class__`. Pass candidate code as a plain multi-line string literal to `run_tests(candidate_code, tests)`.\n"
-            "6. Strict Brevity & Zero Commentary: Output ONLY minimal, clean Python code. NEVER write chain-of-thought, trace logs, or natural language reasoning inside code comments. Do not over-comment."
+            "6. Absolute Zero-Comment Policy: NEVER write comments (`#`) or explanations. Any comment wastes token budget and is strictly forbidden. Output ONLY pure executable code."
         )
 
         user_content = (
             f"TASK: {self.task_definition}\n\n"
             f"REQUIRED FUNCTION SIGNATURE:\n{self.function}\n\n"
             f"TEST CASES:\ntests = {formatted_tests}\n\n"
-            "Start by testing your candidate implementation."
+            "Start by testing your candidate implementation. Output strictly executable code with NO '#' comments."
         )
 
         self.payload: dict[str, Any] = {
@@ -130,8 +131,13 @@ class PromptBuilder:
                     "3. Submit with final_answer(solution_code) after tests pass."
                 )
 
+        no_comment_note = (
+            "\n\nCRITICAL: Do NOT write '#' comments or traces. "
+            "Output ONLY clean executable Python code."
+        )
         feedback_text = (
-            f"{step_header}OBSERVATION:\n{trace}{type_error_hint}{reminder}"
+            f"{step_header}OBSERVATION:\n{trace}{type_error_hint}"
+            f"{no_comment_note}{reminder}"
         )
         feedback: dict[str, Any] = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)

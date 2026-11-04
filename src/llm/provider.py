@@ -133,8 +133,8 @@ class Provider:
             api_keys = [k for k in provider["api_keys"]]
             if not api_keys:
                 continue
-            for key in api_keys:
-                for model in provider["models"]:
+            for model in provider["models"]:
+                for key in api_keys:
                     try:
                         print(
                             f"🔄 Attempting with [{provider['name']}]"
