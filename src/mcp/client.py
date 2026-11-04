@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 from typing import Any, cast
+import time
 
 
 def _parse_command(command: str) -> list[str]:
@@ -274,17 +275,28 @@ class HttpMCPClient:
 
     def start(self) -> None:
         """Initialize the HTTP MCP session."""
-        init_res = self._send_request(
-            "initialize",
-            {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {
-                    "name": "agent_smith_sandbox_http",
-                    "version": "1.0.0",
-                },
-            },
-        )
+        last_error = None
+        init_res = {}
+        for attempt in range(10):
+            try:
+                init_res = self._send_request(
+                    "initialize",
+                    {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {
+                            "name": "agent_smith_sandbox_http",
+                            "version": "1.0.0",
+                        },
+                    },
+                )
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < 10:
+                    time.sleep(1)
+                else:
+                    raise last_error
         capabilities = init_res.get("capabilities", {})
         self.list_tools()
         if "resources" in capabilities:
