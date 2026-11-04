@@ -41,6 +41,11 @@ class MBPPAgentLoop(BaseAgentLoop):
             model_name=model_name,
             provider_url=provider_url,
         )
+        normalized_tests = [
+            t.replace("==", " == ") if "==" in t and " == " not in t else t
+            for t in task.test_list
+        ]
+        self.sandbox.set_test_list(normalized_tests)
         self.prompt = PromptBuilder(task, tools_manual=sandbox.tools)
         self.tests_passed: bool = False
 

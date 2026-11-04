@@ -25,9 +25,25 @@ class PromptBuilder:
         self.function = self.task.function_definition
         self.test_list = self.task.test_list
 
+    @staticmethod
+    def format_tests_for_prompt(
+        test_list: list[str], max_chars: int = 450
+    ) -> str:
+        """Format reference tests for prompt, truncating individual oversized assertions."""
+        formatted: list[str] = []
+        for test in test_list:
+            if len(test) > max_chars:
+                truncated = (
+                    f"{test[:200]} ... [truncated {len(test) - 250} chars] ... {test[-50:]}"
+                )
+                formatted.append(truncated)
+            else:
+                formatted.append(test)
+        return repr(formatted)
+
     def build_initial_payload(self) -> None:
         """Construct initial system and user messages payload."""
-        formatted_tests = repr(self.test_list)
+        formatted_tests = self.format_tests_for_prompt(self.test_list)
         manual_section = self.tools_manual or (
             "AVAILABLE TOOLS:\n"
             "1. run_tests(code: str, test_list: list[str]) -> str:\n"
@@ -44,9 +60,10 @@ class PromptBuilder:
             "CRITICAL RULES:\n"
             "1. Output Observable Results: Every step must produce observable stdout.\n"
             "2. Two-Phase Discipline (Strict):\n"
-            "   - Step 1 (Test): Test candidate code using `print(run_tests(candidate_code, tests))` and STOP. Wait for sandbox output.\n"
+            "   - Step 1 (Test): Test candidate code using `print(run_tests(candidate_code, test_list))` and STOP. Wait for sandbox output.\n"
+            "     Note: The variable test_list is already pre-loaded into the execution namespace. Do NOT re-declare it in your code. Pass it directly: run_tests(your_code, test_list).\n"
             "     Note: `run_tests` returns a JSON string (not a dict); do not index it (`res['success']`).\n"
-            "   - Step 2 (Submit): In a separate step, once tests pass, submit via `final_answer(solution_code)`.\n"
+            "   - Step 2 (Submit): In a separate step, once tests pass, submit via `final_answer(solution_code)` (pass code as string, e.g. `final_answer(candidate)`).\n"
             "   - NEVER call `final_answer` and `run_tests` in the same step.\n"
             "3. Test Integrity (Strict - No Cheating):\n"
             "   - NEVER modify, tamper with, or mock the test assertions or inputs (e.g. altering expected values or changing assertions to force a pass).\n"
@@ -56,14 +73,19 @@ class PromptBuilder:
             "   - Implement complete logic handling edge cases and default returns (None, 0, False, empty values). Hidden tests are evaluated; do not overfit.\n"
             "   - For tie-breaking (equal counts/values), preserve original input order.\n"
             "   - Subarray vs Subsequence: If a 'subsequence' task fails assertions, check whether the problem expects contiguous increasing subarrays/slices (consecutive elements) rather than arbitrary subsequences.\n"
-            "5. Sandbox Security: NEVER access introspection or dunder attributes like `__code__`, `__globals__`, or `__class__`. Pass candidate code as a plain multi-line string literal to `run_tests(candidate_code, tests)`.\n"
+            "   - Subsequence from prefix till index i: An increasing subsequence formed from elements within prefix a[0...i] that can be extended by element a[k] (k > i). It does NOT require a[k] > a[index] and does NOT require that a[index] itself is in the subsequence; do NOT check `if a[k] <= a[index]: return 0`.\n"
+            "   - Bidirectional tuple pairs: MBPP dataset contains a known author flaw in count_bidirectional: the condition MUST literally be written `if test_list[j][0] == test_list[i][1] and test_list[i][1] == test_list[j][0]:` (do NOT 'fix' it to check test_list[i][0]).\n"
+            "   - Combinations/Subsets Ordering: When asked for combinations/subsets of a list, MBPP builds power sets by starting with [[]] and for each element x prepending x: `res += [[x] + sub for sub in res]` (note: `[x] + sub`, NOT `sub + [x]`, and NOT itertools.combinations).\n"
+            "5. Sandbox Security: NEVER access introspection or dunder attributes like `__code__`, `__globals__`, or `__class__`. Pass candidate code as a plain multi-line string literal to `run_tests(candidate_code, test_list)`.\n"
             "6. Absolute Zero-Comment Policy: NEVER write comments (`#`) or explanations. Any comment wastes token budget and is strictly forbidden. Output ONLY pure executable code."
         )
 
         user_content = (
             f"TASK: {self.task_definition}\n\n"
             f"REQUIRED FUNCTION SIGNATURE:\n{self.function}\n\n"
-            f"TEST CASES:\ntests = {formatted_tests}\n\n"
+            f"TEST CASES (reference):\n{formatted_tests}\n\n"
+            "The variable test_list is already pre-loaded into the execution namespace. "
+            "Do NOT re-declare it in your code. Pass it directly: run_tests(your_code, test_list).\n\n"
             "Start by testing your candidate implementation. Output strictly executable code with NO '#' comments."
         )
 
@@ -126,7 +148,7 @@ class PromptBuilder:
             elif step % 5 == 0:
                 reminder = (
                     f"\n\n🔔 REMINDER (Step {step}/{max_steps}):\n"
-                    "1. Test candidate with run_tests(candidate, tests).\n"
+                    "1. Test candidate with run_tests(candidate, test_list).\n"
                     "2. Do NOT combine run_tests and final_answer.\n"
                     "3. Submit with final_answer(solution_code) after tests pass."
                 )

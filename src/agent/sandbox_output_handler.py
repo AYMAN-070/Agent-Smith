@@ -184,7 +184,24 @@ class SandboxOutputHandler:
         status = sand_answer.get("status")
         if status == "success":
             raw_obs = sand_answer.get("output", "").strip()
-            observation = cls.clean_and_truncate(code, raw_obs)
+            clean_text = raw_obs
+            try:
+                import json
+
+                data = json.loads(raw_obs)
+                if isinstance(data, dict) and "output" in data:
+                    clean_text = str(data["output"])
+            except Exception:
+                pass
+
+            observation = cls.clean_and_truncate(
+                code,
+                clean_text,
+                head_lines=15,
+                tail_lines=15,
+                max_line_chars=600,
+                max_total_chars=1200,
+            )
             print("\n👁️  [Observation Output]:")
             print(observation if observation else "(No stdout output)")
 
@@ -193,7 +210,7 @@ class SandboxOutputHandler:
                     "Warning: You defined a function but did NOT print "
                     "any test results and did NOT call final_answer().\n"
                     "To proceed, you MUST either test your function:\n"
-                    "  res = run_tests(candidate, tests)\n"
+                    "  res = run_tests(candidate, test_list)\n"
                     "  print(res)\n"
                     "Or call final_answer(solution_code) if you are sure it works."
                 )
@@ -209,7 +226,7 @@ class SandboxOutputHandler:
                     "[CRITICAL NOTICE: ALL TESTS PASSED!]\n"
                     "All assertions passed. You are done!\n"
                     "Submit your final solution immediately: "
-                    "final_answer(solution_code)"
+                    "final_answer(solution_code) (pass the code as a string, e.g. final_answer(candidate))"
                 )
 
             return observation
@@ -217,10 +234,24 @@ class SandboxOutputHandler:
         raw_error = (
             sand_answer.get("error") or "Execution failed without details."
         )
-        error_trace = cls.clean_and_truncate(code, raw_error)
+        error_trace = cls.clean_and_truncate(
+            code,
+            raw_error,
+            head_lines=15,
+            tail_lines=15,
+            max_line_chars=250,
+            max_total_chars=800,
+        )
         partial_output = sand_answer.get("output", "").strip()
         if partial_output:
-            cleaned_partial = cls.clean_and_truncate(code, partial_output)
+            cleaned_partial = cls.clean_and_truncate(
+                code,
+                partial_output,
+                head_lines=15,
+                tail_lines=15,
+                max_line_chars=250,
+                max_total_chars=800,
+            )
             error_trace += (
                 f"\n\n[PARTIAL OUTPUT BEFORE INTERRUPTION]:\n{cleaned_partial}"
             )
