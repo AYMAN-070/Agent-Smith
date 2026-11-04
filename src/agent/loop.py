@@ -257,7 +257,7 @@ class SWEAgentLoop(BaseAgentLoop):
             return None
         patch_res = self.sandbox.execute("print(get_patch())")
         if patch_res.get("status") == "success" and patch_res.get("output"):
-            candidate_patch = patch_res["output"].strip()
+            candidate_patch: str = str(patch_res["output"]).strip()
             patch_markers = ["diff --git", "--- a/", "+++ b/", "@@"]
             if any(m in candidate_patch for m in patch_markers):
                 print("\n" + "=" * 50)
