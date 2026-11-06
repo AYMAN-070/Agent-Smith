@@ -94,26 +94,26 @@ class Provider:
         else:
             self.provider = [
                 {
-                    "name": "OpenRouter",
-                    "base_url": "https://openrouter.ai/api/v1",
-                    "api_keys": openrouter_keys or openai_keys,
-                    "models": [
-                        "meta-llama/llama-3.3-70b-instruct:free",
-                        "qwen/qwen-2.5-coder-32b-instruct:free",
-                        "mistralai/mistral-small-24b-instruct-2501:free",
-                        "openai/gpt-4o",
-                        "openai/gpt-4o-mini",
-                    ],
-                },
-                {
                     "name": "Gemini",
                     "base_url": (
                         "https://generativelanguage.googleapis.com/v1beta/openai"
                     ),
                     "api_keys": gemini_keys,
                     "models": [
-                        "gemini-3.1-flash-lite",
                         "gemini-3.5-flash-lite",
+                        "gemini-3.1-flash-lite",
+                    ],
+                },
+                {
+                    "name": "OpenRouter",
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "api_keys": openrouter_keys or openai_keys,
+                    "models": [
+                        "meta-llama/llama-3.3-70b-instruct",
+                        "qwen/qwen-2.5-coder-32b-instruct",
+                        "mistralai/mistral-small-24b-instruct-2501",
+                        "openai/gpt-4o",
+                        "openai/gpt-4o-mini",
                     ],
                 },
                 {
