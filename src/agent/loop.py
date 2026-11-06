@@ -41,7 +41,13 @@ class MBPPAgentLoop(BaseAgentLoop):
             model_name=model_name,
             provider_url=provider_url,
         )
+        normalized_tests = [
+            t.replace("==", " == ") if "==" in t and " == " not in t else t
+            for t in task.test_list
+        ]
+        self.sandbox.set_test_list(normalized_tests)
         self.prompt = PromptBuilder(task, tools_manual=sandbox.tools)
+        self.tests_passed: bool = False
 
     def run(self) -> str:
         """Execute the iterative loop to solve the MBPP task."""
@@ -101,6 +107,27 @@ class MBPPAgentLoop(BaseAgentLoop):
                 )
 
                 status = sand_answer.get("status")
+                raw_obs = sand_answer.get("output", "").strip()
+                if SandboxOutputHandler.is_test_run_finished(
+                    code_for_sandbox, raw_obs, has_patch=True, benchmark="mbpp"
+                ):
+                    self.tests_passed = True
+
+                if (
+                    status != "final_answer"
+                    and self.tests_passed
+                    and "def " in code_for_sandbox
+                    and "run_tests" not in code_for_sandbox
+                    and "final_answer" not in code_for_sandbox
+                ):
+                    print(
+                        "\n✨ Auto-submitting verified candidate function as final answer."
+                    )
+                    status = "final_answer"
+                    sand_answer = {
+                        "status": "final_answer",
+                        "answer": self.strip_comments(code_for_sandbox),
+                    }
 
                 # 1. Final answer submitted by the agent
                 if status == "final_answer":
@@ -145,8 +172,9 @@ class MBPPAgentLoop(BaseAgentLoop):
                         "```python ... ```.]\n\n"
                     )
                     feedback = malformed_warn + feedback
+                clean_history_code = self.strip_comments(code_for_sandbox)
                 self.prompt.add_model_response(
-                    f"```python\n{code_for_sandbox}\n```"
+                    f"```python\n{clean_history_code}\n```"
                 )
                 self.prompt.add_error_feedback(
                     feedback, step=step, max_steps=max_loop
@@ -229,7 +257,7 @@ class SWEAgentLoop(BaseAgentLoop):
             return None
         patch_res = self.sandbox.execute("print(get_patch())")
         if patch_res.get("status") == "success" and patch_res.get("output"):
-            candidate_patch = patch_res["output"].strip()
+            candidate_patch: str = str(patch_res["output"]).strip()
             patch_markers = ["diff --git", "--- a/", "+++ b/", "@@"]
             if any(m in candidate_patch for m in patch_markers):
                 print("\n" + "=" * 50)

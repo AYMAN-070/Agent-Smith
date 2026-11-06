@@ -153,6 +153,19 @@ class BaseAgentLoop:
 
         return None
 
+    @staticmethod
+    def strip_comments(code: str) -> str:
+        """Remove full-line comments from code to save tokens in prompt history."""
+        lines = [
+            line for line in code.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        cleaned: list[str] = []
+        for line in lines:
+            if line.strip() or (cleaned and cleaned[-1].strip()):
+                cleaned.append(line)
+        return "\n".join(cleaned).strip()
+
     def handle_no_code(
         self,
         llm_response: LlmResponse,
@@ -165,7 +178,8 @@ class BaseAgentLoop:
         )
         self.reset_repetition_tracker()
         feedback = SandboxOutputHandler.get_no_code_feedback(self.benchmark)
-        self.prompt.add_model_response(llm_response.llm_output)
+        clean_output = self.strip_comments(llm_response.llm_output)
+        self.prompt.add_model_response(clean_output)
         self.prompt.add_feedback(feedback, step=step, max_steps=max_loop)
         return self.record_no_code_step(llm_response, step)
 

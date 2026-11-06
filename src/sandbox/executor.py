@@ -172,6 +172,7 @@ def create_safe_open(
 def create_safe_environment(
     config: SandboxConfig,
     tools: dict[str, Any] | None = None,
+    test_list: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build the globals dictionary used to execute code in the sandbox."""
     safe_builtins = SAFE_BUILTINS.copy()
@@ -182,6 +183,9 @@ def create_safe_environment(
         "__builtins__": safe_builtins,
         "final_answer": agent_final_answer,
     }
+
+    if test_list is not None:
+        environment["test_list"] = test_list.copy()
 
     # Make callable tools (including MCP wrappers) available by name.
     for name, tool in (tools or {}).items():
@@ -312,6 +316,7 @@ def isolated_worker(
     queue: Queue[Any],
     tools: dict[str, Any] | None = None,
     output_filepath: str | None = None,
+    test_list: list[str] | None = None,
 ) -> None:
     """Execute code in a separate process and send its result through the queue."""
     original_stdout = sys.stdout
@@ -340,7 +345,7 @@ def isolated_worker(
 
     try:
         apply_system_limits(config)
-        safe_env = create_safe_environment(config, tools)
+        safe_env = create_safe_environment(config, tools, test_list)
 
         executable_code = transform_to_interactive_code(code)
         exec(executable_code, safe_env)
@@ -351,9 +356,37 @@ def isolated_worker(
         }
 
     except FinalAnswerException as error:
+        answer_val = error.answer
+        if not isinstance(answer_val, str):
+            if callable(answer_val):
+                fn_name = getattr(answer_val, "__name__", None)
+                extracted: str | None = None
+                try:
+                    tree = ast.parse(code)
+                    for node in tree.body:
+                        if (
+                            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                            and node.name == fn_name
+                        ):
+                            extracted = ast.get_source_segment(code, node)
+                            break
+                    if not extracted:
+                        funcs = [
+                            node
+                            for node in tree.body
+                            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                        ]
+                        if len(funcs) == 1:
+                            extracted = ast.get_source_segment(code, funcs[0])
+                except Exception:
+                    pass
+                answer_val = extracted if extracted else str(answer_val)
+            else:
+                answer_val = str(answer_val)
+
         result = {
             "status": "final_answer",
-            "answer": error.answer,
+            "answer": answer_val,
             "output": get_captured_output(),
         }
     except KeyboardInterrupt:
@@ -395,6 +428,11 @@ class SandboxExecutor:
         self.mcp_client: Any = None
         self.tools = self.get_tools_manual()
         self._current_process: multiprocessing.Process | None = None
+        self.test_list: list[str] | None = None
+
+    def set_test_list(self, test_list: list[str]) -> None:
+        """Pre-load the task test assertions into the sandbox namespace."""
+        self.test_list = test_list
 
     def connect_mcp(
         self,
@@ -462,7 +500,14 @@ class SandboxExecutor:
 
         process = multiprocessing.Process(
             target=isolated_worker,
-            args=(code, self.config, result_queue, merged_tools, str(tmp_path)),
+            args=(
+                code,
+                self.config,
+                result_queue,
+                merged_tools,
+                str(tmp_path),
+                self.test_list,
+            ),
         )
         self._current_process = process
 

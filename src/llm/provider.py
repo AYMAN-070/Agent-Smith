@@ -1,5 +1,6 @@
 """Multi-provider LLM API client with fallback cascade."""
 
+import json
 import os
 import time
 from typing import Any
@@ -33,6 +34,7 @@ class Provider:
         self, model: str | None = None, provider: str | None = None
     ) -> None:
         """Initialize provider configurations and API keys from environment."""
+        self.blacklisted_models: set[str] = set()
         gemini_keys = _get_api_keys("GEMINI", "GOOGLE")
         openai_keys = _get_api_keys("OPENAI", "OPEN_AI")
         openrouter_keys = _get_api_keys("OPENROUTER", "OPEN_ROUTER")
@@ -92,14 +94,26 @@ class Provider:
         else:
             self.provider = [
                 {
+                    "name": "OpenRouter",
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "api_keys": openrouter_keys or openai_keys,
+                    "models": [
+                        "meta-llama/llama-3.3-70b-instruct:free",
+                        "qwen/qwen-2.5-coder-32b-instruct:free",
+                        "mistralai/mistral-small-24b-instruct-2501:free",
+                        "openai/gpt-4o",
+                        "openai/gpt-4o-mini",
+                    ],
+                },
+                {
                     "name": "Gemini",
                     "base_url": (
                         "https://generativelanguage.googleapis.com/v1beta/openai"
                     ),
                     "api_keys": gemini_keys,
                     "models": [
-                        "gemini-3.5-flash-lite",
                         "gemini-3.1-flash-lite",
+                        "gemini-3.5-flash-lite",
                     ],
                 },
                 {
@@ -110,31 +124,75 @@ class Provider:
                         "nvidia/nemotron-3-ultra-550b-a55b",
                     ],
                 },
-                {
-                    "name": "OpenRouter",
-                    "base_url": "https://openrouter.ai/api/v1",
-                    "api_keys": openrouter_keys or openai_keys,
-                    "models": [
-                        "openai/gpt-4o",
-                        "openai/gpt-4o-mini",
-                        "meta-llama/llama-3.3-70b-instruct",
-                        "qwen/qwen-2.5-coder-32b-instruct",
-                        "mistralai/mistral-small-24b-instruct-2501",
-                    ],
-                },
             ]
+
+    @staticmethod
+    def _reconstruct_stream(
+        response: requests.Response, fallback_model: str
+    ) -> dict[str, Any]:
+        """Collect SSE chunks from stream and reconstruct standard response dict."""
+        collected: list[str] = []
+        model_name = fallback_model
+        usage: dict[str, Any] = {}
+
+        for line in response.iter_lines():
+            if not line:
+                continue
+            line_str = (
+                line.decode("utf-8") if isinstance(line, bytes) else line
+            )
+            if not line_str.startswith("data:"):
+                continue
+            raw_data = line_str[5:].strip()
+            if raw_data == "[DONE]":
+                break
+            try:
+                chunk = json.loads(raw_data)
+                if chunk.get("error"):
+                    err = chunk["error"].get("message", "API stream error")
+                    raise RuntimeError(err)
+                if chunk.get("model"):
+                    model_name = chunk["model"]
+                if chunk.get("usage"):
+                    usage = chunk["usage"]
+                choices = chunk.get("choices") or []
+                if choices:
+                    delta = choices[0].get("delta") or {}
+                    content = delta.get("content")
+                    if content:
+                        collected.append(content)
+            except json.JSONDecodeError:
+                continue
+
+        return {
+            "model": model_name,
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "".join(collected),
+                    }
+                }
+            ],
+            "usage": usage,
+        }
 
     def send_request(self, payload: dict[str, Any]) -> tuple[Any, int]:
         """Send chat completion request trying providers and models in cascade."""
         retries = 0
-        max_retries = 3
+        max_retries = 2
         last_error = None
         for provider in self.provider:
             api_keys = [k for k in provider["api_keys"]]
             if not api_keys:
                 continue
-            for key in api_keys:
-                for model in provider["models"]:
+            for model in provider["models"]:
+                if model in self.blacklisted_models:
+                    continue
+                skip_model = False
+                for key in api_keys:
+                    if skip_model:
+                        break
                     try:
                         print(
                             f"🔄 Attempting with [{provider['name']}]"
@@ -153,44 +211,52 @@ class Provider:
                             headers["X-Title"] = "Agent-Smith"
 
                         payload["model"] = model
+                        payload["stream"] = True
+                        payload["stream_options"] = {"include_usage": True}
                         for attempt in range(max_retries):
                             try:
                                 response = requests.post(
                                     endpoint,
                                     json=payload,
                                     headers=headers,
-                                    timeout=60,
+                                    stream=True,
+                                    timeout=(2, 5),
                                 )
-                                if response.status_code == 429:
+                                if response.status_code in (401, 403, 429):
                                     retries += 1
                                     print(
-                                        f"⚠️ Quota exceeded (429) for model"
-                                        f" '{model}'. Skipping to next candidate..."
+                                        f"⚠️ Key/Quota issue ({response.status_code}) for model"
+                                        f" '{model}'. Trying next API key..."
                                     )
                                     break
                                 if response.status_code in (
-                                    400,
-                                    401,
-                                    402,
-                                    403,
                                     404,
+                                    500,
+                                    502,
+                                    503,
+                                    504,
                                 ):
+                                    retries += 1
+                                    print(
+                                        f"⚠️ Server/Model error ({response.status_code})"
+                                        f" for [{provider['name']}] | Model: {model}."
+                                        " Skipping model..."
+                                    )
+                                    skip_model = True
+                                    break
+                                if 400 <= response.status_code < 500:
                                     retries += 1
                                     print(
                                         f"⚠️ Client error ({response.status_code})"
                                         f" for [{provider['name']}] | Model: {model}."
-                                        " Skipping..."
+                                        " Skipping model..."
                                     )
+                                    skip_model = True
                                     break
                                 response.raise_for_status()
-                                data: dict[str, Any] = response.json()
-                                if "error" in data:
-                                    print(
-                                        f"⚠️ API Error: {data['error'].get('message')}"
-                                    )
-                                    raise RuntimeError(
-                                        data["error"].get("message")
-                                    )
+                                data: dict[str, Any] = (
+                                    self._reconstruct_stream(response, model)
+                                )
 
                                 print(
                                     f"✅ Success with [{provider['name']}]"
@@ -208,9 +274,12 @@ class Provider:
                                 else:
                                     last_error = err
                                     print(
-                                        f"Failed after {max_retries} attempt on model {model}"
+                                        f"Failed after {max_retries} attempt on model {model}. Skipping model..."
                                     )
+                                    skip_model = True
 
+                        if skip_model:
+                            break
                     except Exception as err:
                         retries += 1
                         last_error = err
@@ -218,6 +287,12 @@ class Provider:
                             f"⚠️ Attempt failed ({err}),"
                             f" falling back to next option..."
                         )
+
+                if model not in self.blacklisted_models:
+                    self.blacklisted_models.add(model)
+                    print(
+                        f"🚫 Blacklisting model '{model}' for remaining iterations of this task."
+                    )
         raise RuntimeError(
             f"❌ Total LLM cascade failure. "
             f"Last encountered error: {last_error}"

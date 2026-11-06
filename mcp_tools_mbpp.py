@@ -98,7 +98,20 @@ def run_tests(code: str, test_list: list[str]) -> str:
             exec(assertion, execution_namespace)
             passed += 1
         except AssertionError:
-            failed_details.append(f"Assertion failed: {assertion}")
+            failure_msg = f"Assertion failed: {assertion}"
+            try:
+                stripped = assertion.strip()
+                if stripped.startswith("assert ") and " == " in stripped:
+                    expr = stripped[7:]
+                    left_expr, right_val = expr.split(" == ", 1)
+                    got_val = eval(left_expr.strip(), execution_namespace)
+                    got_repr = repr(got_val)
+                    if len(got_repr) > 80:
+                        got_repr = got_repr[:77] + "..."
+                    failure_msg += f" (got: {got_repr}, expected: {right_val.strip()})"
+            except Exception:
+                pass
+            failed_details.append(failure_msg)
         except Exception as e:
             failed_details.append(
                 f"Test error on '{assertion}' ({type(e).__name__}): {e}"

@@ -139,10 +139,9 @@ In compliance with Section V.7, we measure three independent intermediary behavi
 | `mistralai/mistral-small-24b-instruct-2501` | `scikit-learn__scikit-learn-13439` | Step 1 | Step 4 | 1 |
 | `mistralai/mistral-small-24b-instruct-2501` | `sympy__sympy-18189` | Step 1 | Step 4 | 1 |
 
-## 5. Triple Systematic Ablation Studies
+## 5. Systematic Ablation Study: Observation Windowing
 
-### Ablation 1: Observation Windowing vs Unbounded Tool Output
-When executing extensive test suites (`run_tests()`), pytest traceback logs frequently exceed 25,000 characters. Without observation windowing, cumulative input tokens scale quadratically, quickly breaching the 300,000 token limit.
+When executing extensive repository test suites (`run_tests()`), pytest traceback logs frequently exceed 25,000 characters. Without observation windowing, cumulative input tokens scale quadratically, quickly breaching the 300,000 token limit.
 
 ![Token Accumulation Curve](benchmarks/assets/token_curve.svg)
 
@@ -151,25 +150,7 @@ When executing extensive test suites (`run_tests()`), pytest traceback logs freq
 | **Baseline (No Truncation)** | 406,777 | ~380,000 | ❌ EXCEEDED (>300k Limit) | 46.7% |
 | **Windowed (4k Char Truncation)** | 184,200 | ~140,000 | ✅ OK (Within Limits) | **92.5%** |
 
-### Ablation 2: Two-Phase Submission Discipline vs One-Shot Submission
-We compared permitting the agent to invoke `final_answer()` in the same iteration as editing/testing versus strict two-phase enforcement (Phase 1: run tests & stop; Phase 2: verify observation & submit final answer).
-
-| Submission Strategy | Premature Submissions | Verification Compliance | Overall Task Solve Rate |
-| :--- | :---: | :---: | :---: |
-| **One-Shot Execution** | 38.5% | 61.5% | 53.3% |
-| **Two-Phase Discipline** | **0.0%** | **100.0%** | **92.5%** |
-
-### Ablation 3: Dynamic MCP Tool Signature Generation vs Static Documentation
-We evaluated static hardcoded prompt templates versus dynamic Python function signature generation parsed from MCP tool input schemas.
-
-| Tool Schema Strategy | Argument Mismatch Rate | JSON Syntax Hallucinations | Average Steps to First Touch |
-| :--- | :---: | :---: | :---: |
-| **Static Generic Prompt** | 27.5% | 18.0% | Step 3.2 |
-| **Dynamic Schema Generation** | **0.0%** | **0.0%** | **Step 1.4** |
-
-## 6. Statistical Rigor & Metric Distribution
-
-### Descriptive Statistics across all Benchmark Executions
+## 6. Descriptive Statistics across Benchmark Runs
 
 | Evaluation Metric | Mean Value | Median Value | Standard Deviation (σ) | Minimum | Maximum |
 | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -178,19 +159,9 @@ We evaluated static hardcoded prompt templates versus dynamic Python function si
 | **Wall-Clock Time** | 67.56s | 15.85s | 137.08s | 6.92s | 790.23s |
 | **Per-Request Latency** | 4.95s | 2.41s | 6.62s | 0.81s | 34.78s |
 
-### Accuracy with 95% Wilson Confidence Intervals
-
-| Model Category | Evaluated Models | Sample Size | Observed Solve Rate | 95% Confidence Interval |
-| :--- | :--- | :---: | :---: | :---: |
-| **Frontier MoE** | `nvidia/nemotron-3-ultra-550b-a55b` | 5 runs | 100.0% (5/5) | [56.6% - 100.0%] |
-| **Frontier Flagship** | `openai/gpt-4o` | 5 runs | 100.0% (5/5) | [56.6% - 100.0%] |
-| **Lightweight Frontier** | `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `openai/gpt-4o-mini` | 15 runs | 100.0% (15/15) | [79.6% - 100.0%] |
-| **Open-Weights Flagship & Code** | `meta-llama/llama-3.3-70b-instruct`, `qwen/qwen-2.5-coder-32b-instruct` | 10 runs | 100.0% (10/10) | [72.2% - 100.0%] |
-| **European Compact Reasoning** | `mistralai/mistral-small-24b-instruct-2501` | 5 runs | 80.0% (4/5) | [37.6% - 96.4%] |
-
 ## 7. Cost-Efficiency Pareto Analysis
 
-Cumulative financial expenditure to execute the entire 40-run benchmark was **$0.1778 USD**.
+While all benchmark runs were executed using free-tier allocations (NVIDIA NIM, Google AI Studio, and OpenRouter free allocations) in compliance with 42 curriculum rules, the table below models equivalent commercial API expenditures to compare real-world production viability:
 
 | Model Identifier | Provider | Mean Cost / Solved Task | Accuracy-to-Cost Efficiency Rank |
 | :--- | :--- | :---: | :---: |
@@ -214,12 +185,12 @@ Cumulative financial expenditure to execute the entire 40-run benchmark was **$0
 
 ```mermaid
 flowchart TD
-    subgraph Optimal ["🟢 Pareto Optimal Frontier (High Accuracy &amp; Sub-Second Latency)"]
+    subgraph Optimal ["🟢 Pareto Optimal Frontier (High Accuracy & Sub-Second Latency)"]
         A["gemini-3.1-flash-lite<br/>0.88s | 100% | $0.0022"]:::optimal
         B["gemini-3.5-flash-lite<br/>0.95s | 100% | $0.0021"]:::optimal
         C["openai/gpt-4o-mini<br/>1.01s | 100% | $0.0032"]:::optimal
     end
-    subgraph Specialists ["🔵 High-Capacity &amp; AST Specialists"]
+    subgraph Specialists ["🔵 High-Capacity & AST Specialists"]
         D["openai/gpt-4o<br/>2.41s | 100% | $0.0520"]:::balanced
         E["meta-llama/llama-3.3-70b<br/>4.38s | 100% | $0.0051"]:::balanced
         F["nvidia/nemotron-3-ultra<br/>4.89s | 100% | FREE Tier"]:::balanced
@@ -238,7 +209,7 @@ flowchart TD
 </details>
 
 ### 8.2. Intermediary Metrics Lifecycle & Agent Control Flow
-This architectural diagram maps where each intermediary metric is measured during task execution:
+This architectural sequence maps where each intermediary metric is evaluated during task execution:
 
 ![Intermediary Metrics Architecture](benchmarks/assets/intermediary_metrics.svg)
 
@@ -254,43 +225,27 @@ sequenceDiagram
 
     H->>L: Initialize Task (Repo + Issue Description)
     Note over L,B: Phase 1: Exploration & Code Search
-    L->>B: execute_command (find / grep)
-    B-->>L: File paths
+    L->>B: search_code / list_files
+    B-->>L: File paths & matching lines
     L->>B: read_file (target file in repo)
     Note over L: 🎯 Metric 1: First Target Touch (Exploration Efficiency)
 
     Note over L,B: Phase 2: Patching & Test Verification
     L->>B: edit_file (apply fix)
-    L->>B: execute_command (pytest / tox)
+    L->>B: run_tests() (official testbed evaluation)
     B-->>L: Tests PASS (green)
     Note over L: 🎯 Metric 2: Test Convergence Step
 
     Note over L,B: Phase 3: Discipline & Submission
-    L->>B: execute_command (git diff)
+    L->>B: get_patch() (git diff inspection)
     L->>H: final_answer(diff_patch)
     Note over L: 🎯 Metric 3: Submission Discipline (0-1 step lag)
 ```
 </details>
 
-### 8.3. Visual Performance & Latency Spectrum
+### 8.3. Visual Performance Spectrum
 
 ![Model Performance Spectrum](benchmarks/assets/model_performance.svg)
-
-| Model Identifier | Solve Rate | Visual Accuracy | Avg Latency | Latency Distribution Bar |
-| :--- | :---: | :--- | :---: | :--- |
-| `nvidia/nemotron-3-ultra-550b-a55b` | 100% | `██████████` (5/5) | 4.89s | `▰▰▰▰▰▱▱▱▱▱` |
-| `gemini-3.5-flash-lite` | 100% | `██████████` (5/5) | 11.58s | `▰▰▰▰▰▰▰▰▰▰` |
-| `gemini-3.1-flash-lite` | 100% | `██████████` (5/5) | 8.08s | `▰▰▰▰▰▰▰▰▱▱` |
-| `openai/gpt-4o` | 100% | `██████████` (5/5) | 2.41s | `▰▰▱▱▱▱▱▱▱▱` |
-| `openai/gpt-4o-mini` | 100% | `██████████` (5/5) | 1.01s | `▰▱▱▱▱▱▱▱▱▱` |
-| `meta-llama/llama-3.3-70b-instruct` | 100% | `██████████` (5/5) | 4.38s | `▰▰▰▰▱▱▱▱▱▱` |
-| `qwen/qwen-2.5-coder-32b-instruct` | 100% | `██████████` (5/5) | 6.09s | `▰▰▰▰▰▰▱▱▱▱` |
-| `mistralai/mistral-small-24b-instruct-2501` | 80% | `████████░░` (4/5) | 1.16s | `▰▱▱▱▱▱▱▱▱▱` |
-
-### 8.4. Token Accumulation Curve: Windowed vs Unbounded (Ablation 1)
-This line chart visualizes the cumulative token consumption over iteration steps. Unbounded pytest logs lead to quadratic explosion breaching the 300k ceiling at Step 6, whereas windowing stabilizes input context consumption well under the safety limit:
-
-![Token Accumulation Curve](benchmarks/assets/token_curve.svg)
 
 ## 9. Reproducibility Details & Architectural Conclusions
 
@@ -306,8 +261,7 @@ This line chart visualizes the cumulative token consumption over iteration steps
 
 ### Exact Reproducibility Specifications
 - **Harness Environment**: Linux x86_64, Python 3.10 / uv, Docker 24+ containerized sandbox.
-- **Hyperparameters**: `temperature = 0.0`, `max_tokens = 4096`, `top_p = 1.0`.
-- **Automated Verification Command**: `make benchmark-report` (or `python3 benchmarks/run_benchmark.py --report-only`).
+- **Hyperparameters**: `temperature = 0.0`, `max_tokens = 800`, `top_p = 0.95`.
 
 ---
 ### Backing Evaluation Files

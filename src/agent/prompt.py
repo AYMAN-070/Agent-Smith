@@ -25,62 +25,48 @@ class PromptBuilder:
         self.function = self.task.function_definition
         self.test_list = self.task.test_list
 
+    @staticmethod
+    def format_tests_for_prompt(
+        test_list: list[str], max_chars: int = 450
+    ) -> str:
+        """Format reference tests for prompt, truncating individual oversized assertions."""
+        formatted: list[str] = []
+        for test in test_list:
+            if len(test) > max_chars:
+                truncated = f"{test[:200]} ... [truncated {len(test) - 250} chars] ... {test[-50:]}"
+                formatted.append(truncated)
+            else:
+                formatted.append(test)
+        return repr(formatted)
+
     def build_initial_payload(self) -> None:
         """Construct initial system and user messages payload."""
-        formatted_tests = repr(self.test_list)
-        manual_section = self.tools_manual or (
-            "AVAILABLE TOOLS:\n"
-            "1. run_tests(code: str, test_list: list[str]) -> str:\n"
-            "   Runs candidate code against test assertions and returns a JSON string ('success': bool, 'output': str).\n"
-            "2. final_answer(solution_code: str):\n"
-            "   Call this built-in function to submit your final solution."
-        )
-
+        formatted_tests = self.format_tests_for_prompt(self.test_list)
         self.system_instruction = (
-            "You are an autonomous Code Agent solving Python programming tasks.\n"
-            "You operate in a secure execution sandbox where you write and execute Python code.\n\n"
-            f"{manual_section}\n\n"
-            "CRITICAL EXECUTION RULES:\n"
-            "1. All tools are callable directly as global Python functions (no import required).\n"
-            "2. Every response MUST produce observable output in the sandbox.\n"
-            "3. TWO-PHASE DISCIPLINE (STRICT):\n"
-            "   - NEVER call final_answer and run_tests in the same script.\n"
-            "   - Phase 1 (Test): Call run_tests, print the result, and STOP. Wait for the sandbox observation.\n"
-            "   - Phase 2 (Submit): In a subsequent step, once you observe that all tests passed, call final_answer.\n"
-            "4. TOOL RETURN VALUES:\n"
-            "   - `run_tests` returns a JSON string (NOT a dictionary). Do NOT do `res['success']`!\n"
-            "   - Simply use `print(res)` so the test output is captured in the observation.\n"
-            "5. TEST INTEGRITY & TIE-BREAKING RULES:\n"
-            "   - NEVER alter, weaken, or modify the provided assertions in `tests` (e.g. NEVER change `==` to `in`, do not alter expected return values).\n"
-            "   - If multiple elements share the same frequency, extremum, or count, the task expects the first one occurring in the original input.\n"
-            "6. GENERALIZATION & SPECIFICATION FIDELITY (CRITICAL):\n"
-            "   - Implement the COMPLETE logic described in the TASK, not just a shortcut to satisfy visible sample tests.\n"
-            "   - Strictly respect all conditions, edge cases, and default return values stated in the prompt (e.g. returning None, 0, False, or empty collections when conditions are not met).\n"
-            "   - The final evaluation includes hidden tests: overfitting or hardcoding for the 2-3 visible assertions will result in total failure.\n\n"
-            "PATTERN 1 - Testing your candidate solution:\n"
-            "```python\n"
-            "candidate = '''\n"
-            "def your_function(...):\n"
+            "You are an autonomous Python code agent in a sandbox.\n"
+            "Output ONLY executable Python code inside ```python ... ``` with ABSOLUTELY ZERO '#' comments or text outside.\n\n"
+            "WORKFLOW (Two Phases):\n"
+            "1. Test Phase: Define solution as a multi-line string and run tests:\n"
+            '   candidate = """\n'
+            "def function_name(...):\n"
             "    ...\n"
-            "'''\n"
-            "res = run_tests(candidate, tests)\n"
-            "print(res)  # Do NOT do res['success'], run_tests returns a JSON string!\n"
-            "```\n\n"
-            "PATTERN 2 - Submitting final solution (ONLY in a separate step after tests pass):\n"
-            "```python\n"
-            "final_answer('''def your_function(...):\n"
-            "    ...\n"
-            "''')\n"
-            "```\n\n"
-            "NEVER combine Pattern 1 and Pattern 2 in the same step.\n"
-            "Output ONLY the python code block enclosed in ```python ... ```."
+            '"""\n'
+            "   print(run_tests(candidate, test_list))\n"
+            "   - `test_list` is pre-loaded in globals. Pass it directly, do NOT re-declare it.\n"
+            "   - `candidate` must be a multi-line string literal (not a function, no __code__).\n\n"
+            "2. Submit Phase: Once all tests pass in stdout, submit:\n"
+            "   final_answer(candidate)\n\n"
+            "RULES:\n"
+            "- Never call run_tests and final_answer in the same step.\n"
+            "- Favor standard Python, handle edge cases (empty, None, 0, order preservation).\n"
+            "- Do NOT tamper with test assertions."
         )
 
         user_content = (
             f"TASK: {self.task_definition}\n\n"
             f"REQUIRED FUNCTION SIGNATURE:\n{self.function}\n\n"
-            f"TEST CASES:\ntests = {formatted_tests}\n\n"
-            "Start by testing your candidate implementation."
+            f"TEST CASES (reference only, pre-loaded in test_list):\n{formatted_tests}\n\n"
+            "Start by testing candidate code. Do NOT re-declare test_list. Output code only with ZERO comments."
         )
 
         self.payload: dict[str, Any] = {
@@ -94,7 +80,7 @@ class PromptBuilder:
                     "content": user_content,
                 },
             ],
-            "temperature": 0.0,
+            "temperature": 0.1,
             "max_tokens": 1000,
             "top_p": 0.95,
         }
@@ -121,6 +107,12 @@ class PromptBuilder:
                 "NOT a dict.\nDo NOT do `res['success']`! "
                 "Simply `print(res)` or use `json.loads(res)`.\n"
             )
+        if "Sandbox security" in trace or "__code__" in trace:
+            type_error_hint += (
+                "\nCRITICAL NOTE: Sandbox security forbids dunder/introspection "
+                "attributes (e.g. `__code__`). Define candidate code as a string "
+                'literal: `candidate = """def func(...): ..."""`.\n'
+            )
 
         step_header = (
             f"[STEP {step}/{max_steps}] " if step and max_steps else ""
@@ -136,13 +128,18 @@ class PromptBuilder:
             elif step % 5 == 0:
                 reminder = (
                     f"\n\n🔔 REMINDER (Step {step}/{max_steps}):\n"
-                    "1. Test candidate with run_tests(candidate, tests).\n"
+                    "1. Test candidate with run_tests(candidate, test_list).\n"
                     "2. Do NOT combine run_tests and final_answer.\n"
                     "3. Submit with final_answer(solution_code) after tests pass."
                 )
 
+        no_comment_note = (
+            "\n\nCRITICAL: Do NOT write '#' comments or traces. "
+            "Output ONLY clean executable Python code."
+        )
         feedback_text = (
-            f"{step_header}OBSERVATION:\n{trace}{type_error_hint}{reminder}"
+            f"{step_header}OBSERVATION:\n{trace}{type_error_hint}"
+            f"{no_comment_note}{reminder}"
         )
         feedback: dict[str, Any] = {"role": "user", "content": feedback_text}
         self.payload["messages"].append(feedback)
@@ -212,7 +209,7 @@ class SWEPromptBuilder:
             "   Do NOT look for new bugs or attempt endless refactoring.\n"
             "10. NEVER call final_answer and exploration/edit tools in the same script.\n"
             "11. BREVITY IS MANDATORY: Output ONLY the minimal executable Python code block in ```python ... ``` without any natural language explanations, prose, or chatter.\n"
-            "12. DECISIVE ACTION PRINCIPLE (CRITICAL):\n"
+            "12. DECISIVE ACTION DIRECTIVE (CRITICAL):\n"
             "   - Do NOT re-read the same function, file, or signature repeatedly.\n"
             "   - Once you spot a missing argument, bug, or flawed condition (such as a missing parameter in a recursive call), apply `edit_file` IMMEDIATELY.\n"
             "   - Re-reading the same lines multiple times without editing is strictly forbidden.\n\n"
@@ -243,8 +240,8 @@ class SWEPromptBuilder:
                 {"role": "system", "content": self.system_instruction},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.0,
-            "max_tokens": 800,
+            "temperature": 0.1,
+            "max_tokens": 1000,
             "top_p": 0.95,
         }
 
