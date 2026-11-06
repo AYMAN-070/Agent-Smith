@@ -8,7 +8,7 @@ The agent solves two complementary tiers of software engineering challenges:
 1. **MBPP (Mostly Basic Python Problems)**: Algorithmic Python challenges requiring function synthesis and assertion testing.
 2. **SWE-bench**: Real-world GitHub issues resolved inside isolated production Docker containers, requiring repository inspection, surgical code edits, test execution, and unified git diff generation.
 
-Built strictly with the Python standard library and `uv`—without external agent orchestration frameworks (such as LangChain, CrewAI, or AutoGen)—Agent Smith relies on three foundational pillars:
+Engineered without high-level agent orchestration frameworks (such as LangChain, CrewAI, or AutoGen)—using Python 3.10, Pydantic, and `uv`—Agent Smith relies on three foundational pillars:
 - **Model Context Protocol (MCP)**: Dynamic tool discovery and execution via JSON-RPC.
 - **Secure Sandbox**: Linux process isolation, kernel `RLIMIT` enforcement, network blocking, and import allowlisting.
 - **Multi-Provider LLM Cascade**: Automatic fallback across API providers with intelligent rate-limit (HTTP 429) recovery.
@@ -119,7 +119,6 @@ The project is structured into clean, decoupled layers separating orchestration,
                                           └───────────────────────────────────┘
 ```
 
-> **Note**: The diagram above is a simplified high-level representation of the agent's runtime architecture. For an exhaustive graph illustrating every decision branch, refer to the full diagram: [Detailed Execution Flow Diagram](execution_flow.png).
 
 ### Directory Structure
 ```
@@ -150,7 +149,7 @@ Agent-Smith/
 │       ├── cli.py           # Interactive REPL interface
 │       ├── executor.py      # Child process runner, RLIMIT, network blocker
 │       └── manual.py        # Auto-generated tools documentation for system prompt
-├── mcp_tools_mbpp.py        # Standalone FastMCP server for MBPP
+├── mcp_tools_mbpp.py        # Standalone stdio JSON-RPC MCP server for MBPP
 ├── mcp_tools_swebench.py    # Standalone FastMCP server for SWE-bench
 ├── sandbox_template.json    # JSON template for sandbox security limits and paths
 ├── execution_flow.png       # Comprehensive decision graph and execution flow
@@ -207,6 +206,7 @@ The core intelligence of Agent Smith resides in `src/agent/loop.py`. It operates
    │ `final_answer`  │ ──► Produces solution.json
    └─────────────────┘
 ```
+> **Note**: The diagram above is a simplified high-level representation of the agent's runtime architecture. For an exhaustive graph illustrating every decision branch, refer to the full diagram: [Detailed Execution Flow Diagram](execution_flow.png).
 
 ### Execution Steps
 1. **Context Initialization**: The prompt builder constructs the system prompt containing the dynamically generated tools manual, operational rules, and problem statement.
@@ -230,20 +230,21 @@ The sandbox (`src/sandbox/executor.py`) acts as a strict security barrier execut
    - Untrusted code runs in a separated fork. Uncaught exceptions, memory errors, or `sys.exit()` cannot crash the orchestrator.
    - Execution is bounded by a strict wall-clock timeout (`max_execution_time_seconds`). Runaway processes are killed via `process.kill()`.
 
-2. **Kernel Resource Limits (`resource.setrlimit`)**:
+2. **Kernel Resource Limits (`resource.setrlimit`) & Process Timeout**:
    - Caps maximum address space (`RLIMIT_AS`) to 512 MB, mitigating memory-exhaustion denial-of-service.
-   - Restricts CPU time (`RLIMIT_CPU`) to terminate infinite computational loops at the kernel level.
+   - Strict wall-clock timeouts (`max_execution_time_seconds`) are enforced at the process boundary to terminate infinite loops and runaway executions.
 
-3. **Network Isolation (`BlockedSocket`)**:
-   - Network access is forbidden inside the sandbox.
-   - `socket.socket` and `_socket.socket` are replaced by `BlockedSocket`, raising immediate `PermissionError` on instantiation. Low-level connection functions (`create_connection`, `getaddrinfo`) are neutralized.
+3. **Network Isolation (`GuardedSocket`)**:
+   - External network access is strictly blocked inside the sandbox.
+   - `socket.socket` is replaced by `GuardedSocket`, restricting connections exclusively to local loopback (`127.0.0.1`, `localhost`) required for local MCP server communication. Any outbound external connection immediately raises `PermissionError`. Low-level resolution functions (`gethostbyname`, `socketpair`, etc.) are neutralized.
 
 4. **Namespace Sanitization & Restricted Built-ins**:
    - Standard `__builtins__` is replaced with an allowlist of safe functions (`print`, `len`, `range`, `dict`, `int`, etc.).
-   - Hazardous primitives capable of arbitrary filesystem manipulation or shell escape (`open`, `eval`, `exec`, `breakpoint`, `compile`) are removed.
+   - Hazardous primitives capable of arbitrary code execution or shell escapes (`eval`, `exec`, `breakpoint`, `compile`) are removed.
+   - Filesystem access is strictly mediated: `open` is replaced by `create_safe_open`, permitting access only within explicitly authorized directories (`/testbed`, `/tmp/agent`).
 
 5. **Import Allowlisting**:
-   - Python's `__import__` is replaced by an import guard. Only packages specified in `authorized_imports` (e.g. `math`, `json`, `re`, `collections`) can be imported. Unauthorized imports raise `ImportError`.
+   - Python's `__import__` is replaced by an import guard (`create_safe_import`). Only modules specified in `authorized_imports` (e.g. `math`, `json`, `re`, `collections`) can be imported. Unauthorized imports raise `ImportError`.
 
 ---
 
@@ -312,26 +313,14 @@ In compliance with **Section V.7 (Model Benchmark Report)** of the 42 curriculum
 - [SWE-bench](https://www.swebench.com)
 - [Python Sandbox](https://docs.python.org/3/library/resource.html)
 
-### AI Usage & Pedagogical Collaboration (Gemini)
+### AI Usage & Collaboration
 
-In accordance with 42 curriculum standards and the 42 AI Charter, the nature, extent, and methodology of Artificial Intelligence usage—primarily **Google Gemini**—during the conception, development, and debugging of Agent Smith is transparently detailed below:
+In accordance with 42 curriculum standards and the 42 AI Charter, Artificial Intelligence (primarily **Google Gemini**) was utilized throughout the conception, development, and debugging of Agent Smith as an interactive pair-programming partner and technical sounding board:
 
-#### 1. Conceptual Mentorship & Architectural Research
-Gemini was leveraged extensively as an interactive tutor and pair-programming partner to build deep foundational understanding of modern agentic systems:
-- **Model Context Protocol (MCP)**: Deconstructing the JSON-RPC 2.0 protocol specifications, investigating transport mechanisms (bidirectional `stdio` pipes vs streaming `HTTP/SSE`), and understanding tool schema discovery (`tools/list` and `tools/call`).
-- **SWE-bench Execution Harness**: Analyzing how SWE-bench evaluates real-world repository bugs inside isolated Docker containers, how unified git diffs are generated, and how regression test suites (`/eval.sh`) validate patches.
-- **ReAct Control Loop**: Deepening understanding of the Thought $\to$ Action $\to$ Observation reasoning paradigm, preventing loop divergence, and designing robust agent termination conditions.
+- **Ecosystem & Protocol Exploration**: Accelerating comprehension of the Model Context Protocol (MCP) JSON-RPC 2.0 specifications (stdio transport, lifecycle handshakes, tool schemas) and dissecting SWE-bench Docker container execution harness requirements.
+- **Architectural Brainstorming**: Investigating implementation strategies for strict sandbox security (process isolation, `RLIMIT_AS`, socket monkeypatching, and path scoping) using standard Python tools without relying on black-box agent frameworks.
+- **AST Manipulation & REPL Dynamics**: Exploring Python's `ast` module to implement automatic expression wrapping (`transform_to_interactive_code`), ensuring unassigned tool outputs are visibly captured by stdout without explicit `print()` calls.
+- **Telemetry & Output Heuristics**: Diagnosing quadratic token explosion during lengthy pytest runs, leading to our dual-ended observation windowing heuristic (retaining head and tail lines of verbose tracebacks).
+- **Container Cleanup & Signals**: Refining Docker process lifecycle management and signal trapping (`SIGINT`, `SIGTERM`, `SIGHUP`) to guarantee zero orphaned containers.
 
-#### 2. Technical Co-Design & Algorithmic Problem Solving
-Gemini acted as a sounding board to design and refine key technical challenges without relying on black-box third-party agent frameworks:
-- **Sandbox Process Model & Kernel Security**:
-  - Investigated how to enforce strict security using *only* Python standard libraries (avoiding forbidden libraries like `RestrictedPython`).
-  - Co-designed kernel resource constraints with `resource.setrlimit(resource.RLIMIT_AS)` to enforce virtual memory limits (512MB) and low-level monkeypatching of `socket` and `_socket` primitives to guarantee complete network isolation.
-  - Formulated the path traversal defense via canonical resolution (`Path.resolve().relative_to()`).
-- **AST Transformation for Interactive REPL (`transform_to_interactive_code`)**:
-  - Used Gemini to explore Python's `ast` module to automatically wrap unassigned top-level tool calls (e.g., `read_file(...)`) in `print(...)`, replicating an interactive Jupyter/IPython experience and preventing silent tool outputs.
-- **Observation Windowing & Token Budgeting**:
-  - Diagnosed quadratic token explosion caused by verbose pytest tracebacks (>25,000 characters).
-  - Designed the **Observation Windowing** heuristic in `SandboxOutputHandler` (retaining the 40-line header and 60-line traceback tail), cutting token consumption by over 50% and keeping execution safely below the 300k token ceiling.
-- **Container Lifecycle & Signal Trapping**:
-  - Co-designed robust Docker container management in `docker_handler.py` and `agent_swebench/__main__.py` using `atexit.register` and OS signal handlers (`SIGINT`, `SIGTERM`, `SIGHUP`) to ensure zero orphan containers remain on forced termination.
+All code, architectural choices, and prompts were iteratively tested, integrated, and fully mastered by the authors, ensuring complete intellectual ownership and live defense readiness.
